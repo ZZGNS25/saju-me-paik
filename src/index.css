@@ -1,111 +1,61 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --ink: #140e0a;
+  --ink-soft: #1c1510;
+  --paper: #f3ebe0;
+  --paper-dim: #e7dccb;
+  --cinnabar: #c42a1c;
+  --cinnabar-deep: #ff6b5a;
+  --gold: #d4b56a;
+  --gold-dim: #a8883f;
+  --text: #e8ddd0;
+  --text-muted: #b5a28f;
+  --line: rgba(196, 42, 28, 0.4);
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  --panel: rgba(22, 14, 10, 0.82);
+  --field: rgba(10, 7, 5, 0.72);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  --font-display: 'East Sea Dokdo', cursive;
+  --font-body: 'East Sea Dokdo', cursive;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-body {
-  margin: 0;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+html,
+body {
   margin: 0;
+  min-height: 100%;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+body {
+  font-family: var(--font-body);
+  color: var(--text);
+  background-color: #0a0705;
+  /* 전통신·요괴 배경을 보이게, 가운데만 살짝 어둡게 */
+  background-image:
+    radial-gradient(ellipse 55% 70% at 50% 45%, rgba(8, 5, 3, 0.55), transparent 72%),
+    linear-gradient(
+      180deg,
+      rgba(8, 5, 3, 0.35) 0%,
+      rgba(8, 5, 3, 0.2) 40%,
+      rgba(8, 5, 3, 0.45) 100%
+    ),
+    url('/korean-yokai-bg.png'),
+    url('/korean-occult-bg.png');
+  background-size: cover, cover, cover, cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+#root {
+  min-height: 100vh;
+}
+
+input[type='date'],
+input[type='time'] {
+  color-scheme: light;
 }

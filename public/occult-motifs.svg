@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="720" viewBox="0 0 720 720" fill="none">
+  <!-- @@\ Üù -->
+  <g opacity="0.55" transform="translate(360 360)">
+    <circle r="118" stroke="#d4b56a" stroke-width="1.2" fill="none"/>
+    <path d="M0 -118 A118 118 0 0 1 0 118 A59 59 0 0 1 0 0 A59 59 0 0 0 0 -118Z" fill="#b42318" fill-opacity="0.35"/>
+    <path d="M0 118 A118 118 0 0 1 0 -118 A59 59 0 0 1 0 0 A59 59 0 0 0 0 118Z" fill="#f3ebe0" fill-opacity="0.22"/>
+    <circle cy="-59" r="14" fill="#f3ebe0" fill-opacity="0.55"/>
+    <circle cy="59" r="14" fill="#b42318" fill-opacity="0.55"/>
+  </g>
+
+  <!-- $‰ ¬: © T     -->
+  <g fill="none" stroke="#d4b56a" stroke-width="1" opacity="0.35">
+    <!-- © -->
+    <path d="M120 180 L132 210 L108 210 Z"/>
+    <path d="M120 198 V230"/>
+    <!-- T -->
+    <path d="M600 170 C610 190 620 205 600 230 C580 205 590 190 600 170Z"/>
+    <!--   -->
+    <rect x="340" y="560" width="40" height="18" rx="2"/>
+    <path d="M360 540 V560"/>
+    <!--  -->
+    <circle cx="150" cy="520" r="18"/>
+    <circle cx="150" cy="520" r="8"/>
+    <!--  -->
+    <path d="M560 500 C575 512 575 528 560 540 C545 528 545 512 560 500Z"/>
+  </g>
+
+  <!-- € ŒX $ À x¥ -->
+  <g stroke="#b42318" stroke-width="1" opacity="0.28" fill="none">
+    <rect x="48" y="48" width="54" height="54"/>
+    <path d="M58 64 H92 M58 76 H92 M58 88 H84"/>
+    <rect x="618" y="48" width="54" height="54"/>
+    <path d="M628 64 H662 M628 76 H662 M628 88 H654"/>
+    <rect x="48" y="618" width="54" height="54"/>
+    <path d="M58 634 H92 M58 646 H92 M58 658 H84"/>
+    <rect x="618" y="618" width="54" height="54"/>
+    <path d="M628 634 H662 M628 646 H662 M628 658 H654"/>
+  </g>
+</svg>
