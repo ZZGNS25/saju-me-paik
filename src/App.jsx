@@ -82,12 +82,6 @@ function App() {
       {warning && (
         <div className="omen-overlay" role="alertdialog" aria-modal="true">
           <div className="omen-warning">
-            <img className="blood blood-1" src="/blood-stain-1.png" alt="" aria-hidden="true" />
-            <img className="blood blood-2" src="/blood-stain-2.png" alt="" aria-hidden="true" />
-            <img className="blood blood-3" src="/blood-stain-1.png" alt="" aria-hidden="true" />
-            <img className="blood blood-4" src="/blood-stain-3.png" alt="" aria-hidden="true" />
-            <img className="blood blood-5" src="/blood-stain-2.png" alt="" aria-hidden="true" />
-            <img className="blood blood-6" src="/blood-stain-3.png" alt="" aria-hidden="true" />
             <p className="omen-title">신벌의 고지</p>
             <p className="omen-text">
               생시와 명식을 빠짐없이 아뢰어라.
