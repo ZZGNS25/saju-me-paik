@@ -272,6 +272,18 @@ select {
   gap: 8px;
 }
 
+.time-selects select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+  padding-right: 14px;
+}
+
+.time-selects select::-ms-expand {
+  display: none;
+}
+
 .time-selects select:disabled {
   opacity: 0.55;
   cursor: not-allowed;
