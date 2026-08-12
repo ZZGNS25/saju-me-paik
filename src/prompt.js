@@ -27,6 +27,11 @@ export function formatBirthTime(
   birthTime,
   { unknownHour = false, unknownMinute = false, unknownPeriod = false } = {},
 ) {
+  // 아무 입력·모름도 없으면 빈 칸
+  if (!birthTime && !unknownHour && !unknownMinute && !unknownPeriod) {
+    return ''
+  }
+
   let period = ''
   let hour12 = '00'
   let minute = '00'
@@ -42,7 +47,7 @@ export function formatBirthTime(
   if (unknownHour) hour12 = '00'
   if (unknownMinute) minute = '00'
 
-  const hourText = `${hour12.padStart(2, '0')}시`
+  const hourText = `${String(hour12).padStart(2, '0')}시`
   const minuteText = `${String(minute).padStart(2, '0')}분`
 
   // 오전/오후 모름이면 기간 표시를 아예 빼기
