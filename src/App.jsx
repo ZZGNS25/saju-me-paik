@@ -25,6 +25,26 @@ function App() {
     unknownPeriod,
   })
 
+  // 오늘 날짜 (YYYY-MM-DD) — date input max용
+  const today = new Date().toISOString().slice(0, 10)
+
+  // 연도는 네 자리까지만 허용 (브라우저 6자리 입력 버그 방지)
+  function handleBirthDateChange(e) {
+    const value = e.target.value
+    if (!value) {
+      setBirthDate('')
+      return
+    }
+
+    const year = value.split('-')[0] || ''
+    if (year.length > 4) {
+      e.target.value = birthDate
+      return
+    }
+
+    setBirthDate(value)
+  }
+
   function isFormComplete() {
     const hasName = name.trim() !== ''
     const hasBirthDate = birthDate !== ''
@@ -134,8 +154,11 @@ function App() {
               <input
                 id="birthDate"
                 type="date"
+                min="1900-01-01"
+                max={today}
                 value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
+                onChange={handleBirthDateChange}
+                onInput={handleBirthDateChange}
               />
               <img
                 className="field-icon"
