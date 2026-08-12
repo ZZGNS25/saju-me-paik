@@ -30,3 +30,12 @@ export function cleanReadingText(text) {
       .trim()
   )
 }
+
+// 고서 단락 구분용: 빈 줄 기준으로 나눕니다
+export function splitReadingParagraphs(text) {
+  if (!text) return []
+  return text
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/\n+/g, ' ').trim())
+    .filter(Boolean)
+}
