@@ -3,7 +3,6 @@ import { useState } from 'react'
 import './App.css'
 import { buildSajuPrompt, formatBirthTime } from './prompt'
 import { generateSajuReading } from './gemini'
-import { splitReadingParagraphs } from './cleanReadingText'
 
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1))
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) =>
@@ -285,27 +284,10 @@ function App() {
 
         {result && (
           <section className="result-panel" aria-live="polite">
-            <div className="result-frame">
-              <header className="result-header">
-                <p className="result-kicker">명식 풀이</p>
-                <div className="result-title-row">
-                  <h2>해석</h2>
-                </div>
-              </header>
-
-              <div className="result-body">
-                {splitReadingParagraphs(result).map((paragraph, index) => (
-                  <div key={index} className="result-block">
-                    {index > 0 && (
-                      <div className="result-divider" aria-hidden="true">
-                        <span />
-                      </div>
-                    )}
-                    <p className="result-para">{paragraph}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <h2>해석</h2>
+            <pre className="result" style={{ whiteSpace: 'pre-wrap' }}>
+              {result}
+            </pre>
           </section>
         )}
       </main>
