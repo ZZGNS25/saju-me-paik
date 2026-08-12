@@ -223,21 +223,8 @@ function App() {
     })
   }
 
-  function leaveViewingIfEdited(partial) {
-    if (!selectedId) return
-    const nextSnapshot = snapshotOf({
-      name,
-      birthDate,
-      period,
-      hour,
-      minute,
-      gender,
-      calendarType,
-      ...partial,
-    })
-    if (nextSnapshot !== loadedSnapshotRef.current) {
-      setSelectedId(null)
-    }
+  function leaveViewingIfEdited() {
+    // 열람 중 수정해도 같은 기록을 갱신(Update)할 수 있도록 선택 상태를 유지합니다.
   }
 
   function focusField(id) {
@@ -416,9 +403,8 @@ function App() {
       return
     }
 
+    const editingId = selectedId
     setResult('')
-    setSelectedId(null)
-    setSelectedName('')
     setShowMissing(false)
     setWarning(false)
     setLoading(true)
@@ -437,28 +423,50 @@ function App() {
       setResult(text)
       setSelectedName(name.trim())
 
-      const { data, error: saveError } = await supabase
-        .from('saju_readings')
-        .insert({
-          name: name.trim(),
-          birth_date: birthDate,
-          period: period || null,
-          hour: hour || null,
-          minute: minute || null,
-          gender,
-          calendar_type: calendarType,
-          result: text,
-        })
-        .select(READING_FIELDS)
-        .single()
-
-      if (saveError) {
-        throw new Error(saveError.message || '사주 결과 저장에 실패했습니다.')
+      const payload = {
+        name: name.trim(),
+        birth_date: birthDate,
+        period: period || null,
+        hour: hour || null,
+        minute: minute || null,
+        gender,
+        calendar_type: calendarType,
+        result: text,
       }
 
-      setSelectedId(data.id)
-      setReadings((prev) => [data, ...prev])
-      loadedSnapshotRef.current = currentSnapshot()
+      if (editingId) {
+        const { data, error: updateError } = await supabase
+          .from('saju_readings')
+          .update(payload)
+          .eq('id', editingId)
+          .select(READING_FIELDS)
+          .single()
+
+        if (updateError) {
+          throw new Error(updateError.message || '사주 결과 수정에 실패했습니다.')
+        }
+
+        setSelectedId(data.id)
+        setReadings((prev) =>
+          prev.map((reading) => (reading.id === data.id ? data : reading)),
+        )
+        loadedSnapshotRef.current = currentSnapshot()
+      } else {
+        const { data, error: saveError } = await supabase
+          .from('saju_readings')
+          .insert(payload)
+          .select(READING_FIELDS)
+          .single()
+
+        if (saveError) {
+          throw new Error(saveError.message || '사주 결과 저장에 실패했습니다.')
+        }
+
+        setSelectedId(data.id)
+        setReadings((prev) => [data, ...prev])
+        loadedSnapshotRef.current = currentSnapshot()
+      }
+
       scrollToResult()
     } catch (err) {
       let message = err.message || '사주 해석 중 오류가 발생했습니다.'
@@ -471,6 +479,28 @@ function App() {
       setError(message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDeleteReading(readingId) {
+    if (!readingId) return
+    const confirmed = window.confirm('이 사주 기록을 삭제할까요?')
+    if (!confirmed) return
+
+    setError('')
+    const { error: deleteError } = await supabase
+      .from('saju_readings')
+      .delete()
+      .eq('id', readingId)
+
+    if (deleteError) {
+      setError(deleteError.message || '사주 기록 삭제에 실패했습니다.')
+      return
+    }
+
+    setReadings((prev) => prev.filter((reading) => reading.id !== readingId))
+    if (selectedId === readingId) {
+      handleNewReading()
     }
   }
 
@@ -561,7 +591,7 @@ function App() {
           ) : (
             <ul className="sidebar-list">
               {readings.map((reading) => (
-                <li key={reading.id}>
+                <li key={reading.id} className="sidebar-item">
                   <button
                     type="button"
                     className={
@@ -577,6 +607,17 @@ function App() {
                         {formatBirthDateLabel(reading.birth_date)}
                       </span>
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    className="sidebar-delete"
+                    aria-label={`${reading.name} 기록 삭제`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      handleDeleteReading(reading.id)
+                    }}
+                  >
+                    삭제
                   </button>
                 </li>
               ))}
@@ -601,7 +642,7 @@ function App() {
               <p className="viewing-note">
                 명부에서 <strong>{selectedName}</strong>님의 풀이를 열람 중입니다.
                 <span className="viewing-note-hint">
-                  내용을 바꾸면 새 사주로 저장됩니다.
+                  다시 풀어보면 이 기록이 수정되고, 삭제도 할 수 있습니다.
                 </span>
               </p>
             )}
@@ -830,10 +871,21 @@ function App() {
             >
               {loading
                 ? '천기를 읽는 중...'
-                : isViewing
+                : selectedId
                   ? '다시 풀어보기'
                   : '내 사주 보기'}
             </button>
+
+            {selectedId && (
+              <button
+                type="button"
+                className="cta-delete"
+                onClick={() => handleDeleteReading(selectedId)}
+                disabled={loading}
+              >
+                이 기록 삭제
+              </button>
+            )}
 
             {error && <p className="error">{error}</p>}
           </section>
