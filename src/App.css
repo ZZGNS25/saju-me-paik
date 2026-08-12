@@ -309,30 +309,6 @@ select {
   border-radius: 8px 16px 7px 14px / 12px 8px 15px 9px;
 }
 
-.select-wrap {
-  position: relative;
-}
-
-.select-fake {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1;
-  pointer-events: none;
-  font-family: var(--font-body);
-  font-size: 1.2rem;
-  color: #2a170c;
-}
-
-select.select-empty {
-  color: transparent;
-}
-
-select.select-empty:focus {
-  color: transparent;
-}
-
 .field-grid .field:first-child select {
   border-radius: 16px 9px 12px 6px / 8px 14px 9px 13px;
 }

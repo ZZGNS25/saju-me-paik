@@ -234,22 +234,18 @@ function App() {
                 <label htmlFor="gender">성별</label>
                 <span className="live">{gender || '--'}</span>
               </div>
-              <div className={`select-wrap${gender ? '' : ' is-empty'}`}>
-                {!gender && (
-                  <span className="select-fake" aria-hidden="true">
-                    --
-                  </span>
-                )}
-                <select
-                  id="gender"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className={gender ? undefined : 'select-empty'}
-                >
-                  <option value="남성">남성</option>
-                  <option value="여성">여성</option>
-                </select>
-              </div>
+              <select
+                id="gender"
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+              >
+                {/* 닫힌 칸에만 -- 표시. 목록에는 나오지 않음(hidden) */}
+                <option value="" disabled hidden>
+                  --
+                </option>
+                <option value="남성">남성</option>
+                <option value="여성">여성</option>
+              </select>
             </div>
 
             <div className="field">
@@ -257,22 +253,17 @@ function App() {
                 <label htmlFor="calendarType">양력/음력</label>
                 <span className="live">{calendarType || '--'}</span>
               </div>
-              <div className={`select-wrap${calendarType ? '' : ' is-empty'}`}>
-                {!calendarType && (
-                  <span className="select-fake" aria-hidden="true">
-                    --
-                  </span>
-                )}
-                <select
-                  id="calendarType"
-                  value={calendarType}
-                  onChange={(e) => setCalendarType(e.target.value)}
-                  className={calendarType ? undefined : 'select-empty'}
-                >
-                  <option value="양력">양력</option>
-                  <option value="음력">음력</option>
-                </select>
-              </div>
+              <select
+                id="calendarType"
+                value={calendarType}
+                onChange={(e) => setCalendarType(e.target.value)}
+              >
+                <option value="" disabled hidden>
+                  --
+                </option>
+                <option value="양력">양력</option>
+                <option value="음력">음력</option>
+              </select>
             </div>
           </div>
 
