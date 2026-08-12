@@ -21,32 +21,36 @@ function toPromptGender(gender) {
 }
 
 // birthTime(HH:MM) + 항목별 모름 체크를 문장으로 합칩니다
+// - 오전/오후 모름: 오전/오후 문구 자체를 숨김
+// - 시/분 모름: 00시 / 00분으로 표시
 export function formatBirthTime(
   birthTime,
   { unknownHour = false, unknownMinute = false, unknownPeriod = false } = {},
 ) {
-  if (!birthTime && unknownHour && unknownMinute && unknownPeriod) {
-    return '모름'
+  let period = ''
+  let hour12 = '00'
+  let minute = '00'
+
+  if (birthTime) {
+    const [h24, m] = birthTime.split(':')
+    const hour24 = Number(h24)
+    period = hour24 < 12 ? '오전' : '오후'
+    hour12 = String(hour24 % 12 === 0 ? 12 : hour24 % 12)
+    minute = m || '00'
   }
 
-  if (!birthTime) {
-    const parts = []
-    if (unknownPeriod) parts.push('오전/오후 모름')
-    if (unknownHour) parts.push('시 모름')
-    if (unknownMinute) parts.push('분 모름')
-    return parts.length > 0 ? parts.join(' ') : ''
+  if (unknownHour) hour12 = '00'
+  if (unknownMinute) minute = '00'
+
+  const hourText = `${hour12.padStart(2, '0')}시`
+  const minuteText = `${String(minute).padStart(2, '0')}분`
+
+  // 오전/오후 모름이면 기간 표시를 아예 빼기
+  if (unknownPeriod || !period) {
+    return `${hourText} ${minuteText}`
   }
 
-  const [h24, minute] = birthTime.split(':')
-  const hour24 = Number(h24)
-  const period = hour24 < 12 ? '오전' : '오후'
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
-
-  const periodText = unknownPeriod ? '오전/오후 모름' : period
-  const hourText = unknownHour ? '시 모름' : `${hour12}시`
-  const minuteText = unknownMinute ? '분 모름' : `${minute}분`
-
-  return `${periodText} ${hourText} ${minuteText}`
+  return `${period} ${hourText} ${minuteText}`
 }
 
 export function buildSajuPrompt({

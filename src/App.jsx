@@ -48,8 +48,9 @@ function App() {
   function isFormComplete() {
     const hasName = name.trim() !== ''
     const hasBirthDate = birthDate !== ''
+    // 시간은 직접 입력하거나, 시·분 모름(00시 00분)으로 채울 수 있음
     const hasBirthTime =
-      birthTime !== '' || (unknownHour && unknownMinute && unknownPeriod)
+      birthTime !== '' || (unknownHour && unknownMinute)
     const hasGender = gender !== ''
     const hasCalendar = calendarType !== ''
     return hasName && hasBirthDate && hasBirthTime && hasGender && hasCalendar
