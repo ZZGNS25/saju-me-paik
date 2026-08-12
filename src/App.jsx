@@ -47,12 +47,10 @@ function App() {
   }
 
   function isFormComplete() {
+    // 시간은 선택 사항 — 이름·생년월일·성별·양력/음력만 필수
     return (
       name.trim() !== '' &&
       birthDate !== '' &&
-      period !== '' &&
-      hour !== '' &&
-      minute !== '' &&
       gender !== '' &&
       calendarType !== ''
     )
@@ -234,31 +232,47 @@ function App() {
             <div className="field">
               <div className="field-head">
                 <label htmlFor="gender">성별</label>
-                <span className="live">{gender}</span>
+                <span className="live">{gender || '--'}</span>
               </div>
-              <select
-                id="gender"
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-              >
-                <option value="남성">남성</option>
-                <option value="여성">여성</option>
-              </select>
+              <div className={`select-wrap${gender ? '' : ' is-empty'}`}>
+                {!gender && (
+                  <span className="select-fake" aria-hidden="true">
+                    --
+                  </span>
+                )}
+                <select
+                  id="gender"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className={gender ? undefined : 'select-empty'}
+                >
+                  <option value="남성">남성</option>
+                  <option value="여성">여성</option>
+                </select>
+              </div>
             </div>
 
             <div className="field">
               <div className="field-head">
                 <label htmlFor="calendarType">양력/음력</label>
-                <span className="live">{calendarType}</span>
+                <span className="live">{calendarType || '--'}</span>
               </div>
-              <select
-                id="calendarType"
-                value={calendarType}
-                onChange={(e) => setCalendarType(e.target.value)}
-              >
-                <option value="양력">양력</option>
-                <option value="음력">음력</option>
-              </select>
+              <div className={`select-wrap${calendarType ? '' : ' is-empty'}`}>
+                {!calendarType && (
+                  <span className="select-fake" aria-hidden="true">
+                    --
+                  </span>
+                )}
+                <select
+                  id="calendarType"
+                  value={calendarType}
+                  onChange={(e) => setCalendarType(e.target.value)}
+                  className={calendarType ? undefined : 'select-empty'}
+                >
+                  <option value="양력">양력</option>
+                  <option value="음력">음력</option>
+                </select>
+              </div>
             </div>
           </div>
 

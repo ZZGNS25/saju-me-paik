@@ -40,7 +40,10 @@ export function buildSajuPrompt({
   const age = getKoreanAge(birthDate)
   const ageText = age === null ? '나이 정보 없음' : `만 ${age}세`
   const promptGender = toPromptGender(gender)
-  const birthTimeText = formatBirthTime({ period, hour, minute })
+  const birthTimeText =
+    !period && !hour && !minute
+      ? '모름'
+      : formatBirthTime({ period, hour, minute })
 
   return `return only Korean.
 
