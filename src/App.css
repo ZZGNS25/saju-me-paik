@@ -367,6 +367,62 @@ select option {
   animation: omen-fade 0.35s ease both;
 }
 
+.reading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 2, 1, 0.86);
+  backdrop-filter: blur(3px);
+  animation: omen-fade 0.35s ease both;
+}
+
+.reading-panel {
+  width: min(360px, 100%);
+  text-align: center;
+  padding: 22px 18px 26px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(120, 30, 10, 0.35), transparent 55%),
+    linear-gradient(180deg, rgba(28, 16, 10, 0.95), rgba(8, 4, 2, 0.98));
+  border: 1px solid rgba(180, 35, 24, 0.45);
+  border-radius: 14px 6px 16px 8px / 10px 14px 7px 12px;
+  box-shadow: 0 0 40px rgba(120, 20, 0, 0.35);
+}
+
+.reading-gif {
+  display: block;
+  width: min(280px, 78vw);
+  height: auto;
+  margin: 0 auto 16px;
+  border: 1px solid rgba(168, 136, 63, 0.35);
+  border-radius: 10px 4px 12px 6px / 8px 12px 5px 10px;
+  image-rendering: auto;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.35);
+}
+
+.reading-text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 5vw, 2rem);
+  letter-spacing: 0.12em;
+  color: #f0d2b8;
+  text-shadow: 0 0 16px rgba(180, 35, 24, 0.45);
+  animation: reading-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes reading-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .omen-warning {
   position: relative;
   width: min(440px, 100%);

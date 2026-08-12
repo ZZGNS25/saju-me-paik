@@ -99,6 +99,19 @@ function App() {
     <div className="page">
       <div className="atmosphere" aria-hidden="true" />
 
+      {loading && (
+        <div className="reading-overlay" role="status" aria-live="polite">
+          <div className="reading-panel">
+            <img
+              className="reading-gif"
+              src="/sinnaerim.gif"
+              alt="신내림 의식"
+            />
+            <p className="reading-text">천기를 읽는 중...</p>
+          </div>
+        </div>
+      )}
+
       {warning && (
         <div className="omen-overlay" role="alertdialog" aria-modal="true">
           <div className="omen-warning">
@@ -260,7 +273,7 @@ function App() {
             onClick={handleAnalyze}
             disabled={loading}
           >
-            {loading ? '풀이 중...' : '내 사주 보기'}
+            {loading ? '천기를 읽는 중...' : '내 사주 보기'}
           </button>
 
           {error && <p className="error">{error}</p>}
