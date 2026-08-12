@@ -15,9 +15,6 @@ function App() {
   const [period, setPeriod] = useState('') // 오전 | 오후 | ''
   const [hour, setHour] = useState('') // 1~12 | ''
   const [minute, setMinute] = useState('') // 00~59 | ''
-  const [unknownHour, setUnknownHour] = useState(false)
-  const [unknownMinute, setUnknownMinute] = useState(false)
-  const [unknownPeriod, setUnknownPeriod] = useState(false)
   const [gender, setGender] = useState('')
   const [calendarType, setCalendarType] = useState('')
 
@@ -26,14 +23,7 @@ function App() {
   const [error, setError] = useState('')
   const [warning, setWarning] = useState(false)
 
-  const birthTimeText = formatBirthTime({
-    period,
-    hour,
-    minute,
-    unknownHour,
-    unknownMinute,
-    unknownPeriod,
-  })
+  const birthTimeText = formatBirthTime({ period, hour, minute })
 
   // 오늘 날짜 (YYYY-MM-DD) — date input max용
   const today = new Date().toISOString().slice(0, 10)
@@ -56,21 +46,14 @@ function App() {
   }
 
   function isFormComplete() {
-    const hasName = name.trim() !== ''
-    const hasBirthDate = birthDate !== ''
-    const hasPeriod = unknownPeriod || period !== ''
-    const hasHour = unknownHour || hour !== ''
-    const hasMinute = unknownMinute || minute !== ''
-    const hasGender = gender !== ''
-    const hasCalendar = calendarType !== ''
     return (
-      hasName &&
-      hasBirthDate &&
-      hasPeriod &&
-      hasHour &&
-      hasMinute &&
-      hasGender &&
-      hasCalendar
+      name.trim() !== '' &&
+      birthDate !== '' &&
+      period !== '' &&
+      hour !== '' &&
+      minute !== '' &&
+      gender !== '' &&
+      calendarType !== ''
     )
   }
 
@@ -93,9 +76,6 @@ function App() {
         period,
         hour,
         minute,
-        unknownHour,
-        unknownMinute,
-        unknownPeriod,
         gender,
         calendarType,
       })
@@ -211,8 +191,7 @@ function App() {
               <select
                 id="period"
                 aria-label="오전 오후"
-                value={unknownPeriod ? '' : period}
-                disabled={unknownPeriod}
+                value={period}
                 onChange={(e) => setPeriod(e.target.value)}
               >
                 <option value="">--</option>
@@ -223,8 +202,7 @@ function App() {
               <select
                 id="hour"
                 aria-label="시"
-                value={unknownHour ? '' : hour}
-                disabled={unknownHour}
+                value={hour}
                 onChange={(e) => setHour(e.target.value)}
               >
                 <option value="">--</option>
@@ -238,8 +216,7 @@ function App() {
               <select
                 id="minute"
                 aria-label="분"
-                value={unknownMinute ? '' : minute}
-                disabled={unknownMinute}
+                value={minute}
                 onChange={(e) => setMinute(e.target.value)}
               >
                 <option value="">--</option>
@@ -249,41 +226,6 @@ function App() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="unknown-row">
-              <label className="chip">
-                <input
-                  type="checkbox"
-                  checked={unknownHour}
-                  onChange={(e) => {
-                    setUnknownHour(e.target.checked)
-                    if (e.target.checked) setHour('')
-                  }}
-                />
-                시 모름
-              </label>
-              <label className="chip">
-                <input
-                  type="checkbox"
-                  checked={unknownMinute}
-                  onChange={(e) => {
-                    setUnknownMinute(e.target.checked)
-                    if (e.target.checked) setMinute('')
-                  }}
-                />
-                분 모름
-              </label>
-              <label className="chip">
-                <input
-                  type="checkbox"
-                  checked={unknownPeriod}
-                  onChange={(e) => {
-                    setUnknownPeriod(e.target.checked)
-                    if (e.target.checked) setPeriod('')
-                  }}
-                />
-                오전/오후 모름
-              </label>
             </div>
           </div>
 

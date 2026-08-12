@@ -20,28 +20,12 @@ function toPromptGender(gender) {
   return gender || 'unknown'
 }
 
-// 오전/오후·시·분을 따로 받아 표시합니다
-// - 고르기 전: --
-// - 시/분 모름: 00
-// - 오전/오후 모름: 오전·오후 문구 숨김
-export function formatBirthTime({
-  period = '',
-  hour = '',
-  minute = '',
-  unknownHour = false,
-  unknownMinute = false,
-  unknownPeriod = false,
-} = {}) {
-  const periodText = unknownPeriod ? '' : period
-  const hourText = unknownHour ? '00' : hour ? String(hour).padStart(2, '0') : '--'
-  const minuteText = unknownMinute
-    ? '00'
-    : minute
-      ? String(minute).padStart(2, '0')
-      : '--'
-
+// 오전/오후·시·분을 따로 받아 표시합니다 (미선택: --)
+export function formatBirthTime({ period = '', hour = '', minute = '' } = {}) {
+  const hourText = hour ? String(hour).padStart(2, '0') : '--'
+  const minuteText = minute ? String(minute).padStart(2, '0') : '--'
   const clock = `${hourText}:${minuteText}`
-  return periodText ? `${periodText} ${clock}` : clock
+  return period ? `${period} ${clock}` : clock
 }
 
 export function buildSajuPrompt({
@@ -50,24 +34,13 @@ export function buildSajuPrompt({
   period,
   hour,
   minute,
-  unknownHour,
-  unknownMinute,
-  unknownPeriod,
   gender,
   calendarType,
 }) {
   const age = getKoreanAge(birthDate)
   const ageText = age === null ? '나이 정보 없음' : `만 ${age}세`
   const promptGender = toPromptGender(gender)
-  const timeParts = {
-    period,
-    hour,
-    minute,
-    unknownHour,
-    unknownMinute,
-    unknownPeriod,
-  }
-  const birthTimeText = formatBirthTime(timeParts)
+  const birthTimeText = formatBirthTime({ period, hour, minute })
 
   return `return only Korean.
 
