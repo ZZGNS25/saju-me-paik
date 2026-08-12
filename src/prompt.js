@@ -20,43 +20,36 @@ function toPromptGender(gender) {
   return gender || 'unknown'
 }
 
-// birthTime(HH:MM) + 항목별 모름 체크를 문장으로 합칩니다
-// - 시간/분을 고르기 전: --:--
+// 오전/오후·시·분을 따로 받아 표시합니다
+// - 고르기 전: --
 // - 시/분 모름: 00
 // - 오전/오후 모름: 오전·오후 문구 숨김
-export function formatBirthTime(
-  birthTime,
-  { unknownHour = false, unknownMinute = false, unknownPeriod = false } = {},
-) {
-  let period = ''
-  let hour = '--'
-  let minute = '--'
+export function formatBirthTime({
+  period = '',
+  hour = '',
+  minute = '',
+  unknownHour = false,
+  unknownMinute = false,
+  unknownPeriod = false,
+} = {}) {
+  const periodText = unknownPeriod ? '' : period
+  const hourText = unknownHour ? '00' : hour ? String(hour).padStart(2, '0') : '--'
+  const minuteText = unknownMinute
+    ? '00'
+    : minute
+      ? String(minute).padStart(2, '0')
+      : '--'
 
-  // 사용자가 시간 입력칸에서 값을 고른 뒤에만 시·분 채움
-  if (birthTime) {
-    const [h24, m] = birthTime.split(':')
-    const hour24 = Number(h24)
-    period = hour24 < 12 ? '오전' : '오후'
-    hour = String(hour24 % 12 === 0 ? 12 : hour24 % 12).padStart(2, '0')
-    minute = String(m || '00').padStart(2, '0')
-  }
-
-  if (unknownHour) hour = '00'
-  if (unknownMinute) minute = '00'
-
-  const clock = `${hour}:${minute}`
-
-  if (unknownPeriod || !period) {
-    return clock
-  }
-
-  return `${period} ${clock}`
+  const clock = `${hourText}:${minuteText}`
+  return periodText ? `${periodText} ${clock}` : clock
 }
 
 export function buildSajuPrompt({
   name,
   birthDate,
-  birthTime,
+  period,
+  hour,
+  minute,
   unknownHour,
   unknownMinute,
   unknownPeriod,
@@ -66,11 +59,15 @@ export function buildSajuPrompt({
   const age = getKoreanAge(birthDate)
   const ageText = age === null ? '나이 정보 없음' : `만 ${age}세`
   const promptGender = toPromptGender(gender)
-  const birthTimeText = formatBirthTime(birthTime, {
+  const timeParts = {
+    period,
+    hour,
+    minute,
     unknownHour,
     unknownMinute,
     unknownPeriod,
-  })
+  }
+  const birthTimeText = formatBirthTime(timeParts)
 
   return `return only Korean.
 

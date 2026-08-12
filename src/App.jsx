@@ -4,10 +4,17 @@ import './App.css'
 import { buildSajuPrompt, formatBirthTime } from './prompt'
 import { generateSajuReading } from './gemini'
 
+const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1))
+const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) =>
+  String(i).padStart(2, '0'),
+)
+
 function App() {
   const [name, setName] = useState('')
   const [birthDate, setBirthDate] = useState('')
-  const [birthTime, setBirthTime] = useState('')
+  const [period, setPeriod] = useState('') // 오전 | 오후 | ''
+  const [hour, setHour] = useState('') // 1~12 | ''
+  const [minute, setMinute] = useState('') // 00~59 | ''
   const [unknownHour, setUnknownHour] = useState(false)
   const [unknownMinute, setUnknownMinute] = useState(false)
   const [unknownPeriod, setUnknownPeriod] = useState(false)
@@ -19,7 +26,10 @@ function App() {
   const [error, setError] = useState('')
   const [warning, setWarning] = useState(false)
 
-  const birthTimeText = formatBirthTime(birthTime, {
+  const birthTimeText = formatBirthTime({
+    period,
+    hour,
+    minute,
     unknownHour,
     unknownMinute,
     unknownPeriod,
@@ -48,19 +58,26 @@ function App() {
   function isFormComplete() {
     const hasName = name.trim() !== ''
     const hasBirthDate = birthDate !== ''
-    // 시간은 직접 입력하거나, 시·분 모름(00시 00분)으로 채울 수 있음
-    const hasBirthTime =
-      birthTime !== '' || (unknownHour && unknownMinute)
+    const hasPeriod = unknownPeriod || period !== ''
+    const hasHour = unknownHour || hour !== ''
+    const hasMinute = unknownMinute || minute !== ''
     const hasGender = gender !== ''
     const hasCalendar = calendarType !== ''
-    return hasName && hasBirthDate && hasBirthTime && hasGender && hasCalendar
+    return (
+      hasName &&
+      hasBirthDate &&
+      hasPeriod &&
+      hasHour &&
+      hasMinute &&
+      hasGender &&
+      hasCalendar
+    )
   }
 
   async function handleAnalyze() {
     setError('')
     setResult('')
 
-    // 정보가 비어 있으면 API 호출 없이 경고만 표시
     if (!isFormComplete()) {
       setWarning(true)
       return
@@ -73,7 +90,9 @@ function App() {
       const prompt = buildSajuPrompt({
         name,
         birthDate,
-        birthTime,
+        period,
+        hour,
+        minute,
         unknownHour,
         unknownMinute,
         unknownPeriod,
@@ -188,26 +207,58 @@ function App() {
               <span className="label-text">태어난 시간</span>
               <span className="live">{birthTimeText}</span>
             </div>
-            <div className="input-with-icon">
-              <input
-                id="birthTime"
-                type="time"
-                value={birthTime}
-                onChange={(e) => setBirthTime(e.target.value)}
-              />
-              <img
-                className="field-icon"
-                src="/icon-time.svg"
-                alt=""
-                aria-hidden="true"
-              />
+            <div className="time-selects">
+              <select
+                id="period"
+                aria-label="오전 오후"
+                value={unknownPeriod ? '' : period}
+                disabled={unknownPeriod}
+                onChange={(e) => setPeriod(e.target.value)}
+              >
+                <option value="">--</option>
+                <option value="오전">오전</option>
+                <option value="오후">오후</option>
+              </select>
+
+              <select
+                id="hour"
+                aria-label="시"
+                value={unknownHour ? '' : hour}
+                disabled={unknownHour}
+                onChange={(e) => setHour(e.target.value)}
+              >
+                <option value="">--</option>
+                {HOUR_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {value.padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                id="minute"
+                aria-label="분"
+                value={unknownMinute ? '' : minute}
+                disabled={unknownMinute}
+                onChange={(e) => setMinute(e.target.value)}
+              >
+                <option value="">--</option>
+                {MINUTE_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="unknown-row">
               <label className="chip">
                 <input
                   type="checkbox"
                   checked={unknownHour}
-                  onChange={(e) => setUnknownHour(e.target.checked)}
+                  onChange={(e) => {
+                    setUnknownHour(e.target.checked)
+                    if (e.target.checked) setHour('')
+                  }}
                 />
                 시 모름
               </label>
@@ -215,7 +266,10 @@ function App() {
                 <input
                   type="checkbox"
                   checked={unknownMinute}
-                  onChange={(e) => setUnknownMinute(e.target.checked)}
+                  onChange={(e) => {
+                    setUnknownMinute(e.target.checked)
+                    if (e.target.checked) setMinute('')
+                  }}
                 />
                 분 모름
               </label>
@@ -223,7 +277,10 @@ function App() {
                 <input
                   type="checkbox"
                   checked={unknownPeriod}
-                  onChange={(e) => setUnknownPeriod(e.target.checked)}
+                  onChange={(e) => {
+                    setUnknownPeriod(e.target.checked)
+                    if (e.target.checked) setPeriod('')
+                  }}
                 />
                 오전/오후 모름
               </label>

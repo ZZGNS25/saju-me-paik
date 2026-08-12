@@ -173,6 +173,17 @@ select {
   padding-right: 44px;
 }
 
+.time-selects {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.time-selects select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* 기본 아이콘은 투명하게 두고, 클릭 영역만 유지 */
 .input-with-icon input[type='date']::-webkit-calendar-picker-indicator,
 .input-with-icon input[type='time']::-webkit-calendar-picker-indicator {
