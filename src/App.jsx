@@ -240,7 +240,6 @@ function App() {
                 value={gender}
                 onChange={(e) => setGender(e.target.value)}
               >
-                <option value="">선택하세요</option>
                 <option value="남성">남성</option>
                 <option value="여성">여성</option>
               </select>
@@ -256,7 +255,6 @@ function App() {
                 value={calendarType}
                 onChange={(e) => setCalendarType(e.target.value)}
               >
-                <option value="">선택하세요</option>
                 <option value="양력">양력</option>
                 <option value="음력">음력</option>
               </select>
