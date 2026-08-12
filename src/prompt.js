@@ -22,6 +22,7 @@ function toPromptGender(gender) {
 
 // 오전/오후·시·분을 따로 받아 표시합니다 (미선택: --)
 export function formatBirthTime({ period = '', hour = '', minute = '' } = {}) {
+  if (!period && !hour && !minute) return '--:--'
   const hourText = hour ? String(hour).padStart(2, '0') : '--'
   const minuteText = minute ? String(minute).padStart(2, '0') : '--'
   const clock = `${hourText}:${minuteText}`
