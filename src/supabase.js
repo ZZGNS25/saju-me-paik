@@ -10,4 +10,31 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+})
+
+/** Supabase/JWT 오류를 사용자용 한글로 바꿉니다. */
+export function formatSupabaseError(error, fallback = '요청에 실패했습니다.') {
+  const message = String(error?.message || error || '')
+  const lower = message.toLowerCase()
+
+  if (
+    lower.includes('jwt issued at future') ||
+    lower.includes('token used before issued') ||
+    lower.includes('issued at future')
+  ) {
+    return '컴퓨터 시간이 실제보다 느립니다. Windows 시간을 인터넷과 동기화한 뒤, 로그아웃 후 다시 로그인해 주세요.'
+  }
+
+  if (lower.includes('jwt expired') || lower.includes('token is expired')) {
+    return '로그인 세션이 만료되었습니다. 다시 로그인해 주세요. (컴퓨터 시간도 확인해 보세요)'
+  }
+
+  return message || fallback
+}

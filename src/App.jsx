@@ -3,7 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { buildSajuPrompt, formatBirthTime } from './prompt'
 import { generateSajuReading } from './gemini'
-import { supabase } from './supabase'
+import { supabase, formatSupabaseError } from './supabase'
+import ProfileModal, { profileToFormValues } from './ProfileModal'
+
+const PROFILE_FIELDS =
+  'id, owner_id, name, birth_date, period, hour, minute, gender, calendar_type, created_at, updated_at'
+const SELECTED_PROFILE_KEY = 'saju-me-selected-profile'
 
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1))
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) =>
@@ -21,7 +26,7 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) =>
 )
 
 const READING_FIELDS =
-  'id, name, birth_date, period, hour, minute, gender, calendar_type, result, created_at'
+  'id, name, birth_date, period, hour, minute, gender, calendar_type, result, created_at, profile_id'
 
 function daysInMonth(year, month) {
   if (!year || !month) return 31
@@ -101,6 +106,20 @@ function App() {
   const [selectedName, setSelectedName] = useState('')
   const [listError, setListError] = useState('')
   const [listLoading, setListLoading] = useState(true)
+  const [user, setUser] = useState(null)
+  const [authReady, setAuthReady] = useState(false)
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState('')
+  const [profile, setProfile] = useState(null)
+  const [profiles, setProfiles] = useState([])
+  const [profileReady, setProfileReady] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [showProfileCreate, setShowProfileCreate] = useState(false)
+  const [showProfileEdit, setShowProfileEdit] = useState(false)
+  const [profileBusy, setProfileBusy] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const loadedSnapshotRef = useRef('')
 
   const birthTimeText = formatBirthTime({ period, hour, minute })
@@ -199,6 +218,23 @@ function App() {
     setCalendarType('')
   }
 
+  function applyProfileToForm(nextProfile = profile) {
+    const values = profileToFormValues(nextProfile)
+    if (!values) {
+      clearFormFields()
+      return
+    }
+    setName(values.name)
+    setBirthYear(values.birthYear)
+    setBirthMonth(values.birthMonth)
+    setBirthDay(values.birthDay)
+    setPeriod(values.period)
+    setHour(values.hour)
+    setMinute(values.minute)
+    setGender(values.gender)
+    setCalendarType(values.calendarType)
+  }
+
   function snapshotOf(values) {
     return [
       values.name.trim(),
@@ -258,6 +294,13 @@ function App() {
   }
 
   async function loadReadings() {
+    if (!user) {
+      setReadings([])
+      setListLoading(false)
+      setListError('')
+      return
+    }
+
     setListLoading(true)
     setListError('')
     const { data, error: fetchError } = await supabase
@@ -276,9 +319,251 @@ function App() {
     setListLoading(false)
   }
 
+  async function loadProfiles(nextUser = user) {
+    if (!nextUser) {
+      setProfile(null)
+      setProfiles([])
+      setProfileReady(false)
+      setShowOnboarding(false)
+      setShowProfileCreate(false)
+      setShowProfileEdit(false)
+      setProfileError('')
+      return
+    }
+
+    setProfileReady(false)
+    setProfileError('')
+    const { data, error: fetchError } = await supabase
+      .from('profiles')
+      .select(PROFILE_FIELDS)
+      .eq('owner_id', nextUser.id)
+      .order('created_at', { ascending: true })
+
+    if (fetchError) {
+      console.error(fetchError)
+      setProfileError(
+        formatSupabaseError(fetchError, '프로필을 불러오지 못했습니다.'),
+      )
+      setProfiles([])
+      setProfile(null)
+      setProfileReady(true)
+      setShowOnboarding(true)
+      return
+    }
+
+    const list = data ?? []
+    setProfiles(list)
+    setProfileReady(true)
+
+    if (list.length === 0) {
+      setProfile(null)
+      setShowOnboarding(true)
+      return
+    }
+
+    const savedId = window.localStorage.getItem(SELECTED_PROFILE_KEY)
+    const selected =
+      list.find((item) => item.id === savedId) || list[0]
+
+    setProfile(selected)
+    window.localStorage.setItem(SELECTED_PROFILE_KEY, selected.id)
+    setShowOnboarding(false)
+    applyProfileToForm(selected)
+  }
+
+  function handleSelectProfile(profileId) {
+    const selected = profiles.find((item) => item.id === profileId)
+    if (!selected) return
+    setProfile(selected)
+    window.localStorage.setItem(SELECTED_PROFILE_KEY, selected.id)
+    if (!selectedId) {
+      applyProfileToForm(selected)
+      loadedSnapshotRef.current = ''
+    }
+  }
+
   useEffect(() => {
-    loadReadings()
+    let mounted = true
+
+    const search = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const oauthError =
+      search.get('error_description') ||
+      search.get('error') ||
+      hash.get('error_description') ||
+      hash.get('error')
+    if (oauthError) {
+      setAuthError(
+        formatSupabaseError(
+          decodeURIComponent(oauthError.replace(/\+/g, ' ')),
+          '로그인에 실패했습니다.',
+        ),
+      )
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+
+    supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!mounted) return
+      if (sessionError) {
+        console.error(sessionError)
+        setAuthError(sessionError.message || '로그인 상태를 확인하지 못했습니다.')
+      }
+      setUser(data.session?.user ?? null)
+      setAuthReady(true)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null)
+      setAuthReady(true)
+      if (event === 'SIGNED_IN') {
+        setAuthError('')
+        setAuthBusy(false)
+        if (window.location.search || window.location.hash) {
+          window.history.replaceState({}, document.title, window.location.pathname)
+        }
+      }
+      if (event === 'SIGNED_OUT') {
+        setAuthBusy(false)
+        setProfile(null)
+        setProfiles([])
+        setProfileReady(false)
+        setShowOnboarding(false)
+        setShowProfileCreate(false)
+        setShowProfileEdit(false)
+      }
+    })
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [])
+
+  useEffect(() => {
+    if (!authReady) return
+    loadReadings()
+  }, [authReady, user?.id])
+
+  useEffect(() => {
+    if (!authReady) return
+    loadProfiles(user)
+  }, [authReady, user?.id])
+
+  async function handleGoogleLogin() {
+    setAuthBusy(true)
+    setAuthError('')
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+        queryParams: {
+          access_type: 'online',
+          prompt: 'select_account',
+        },
+      },
+    })
+    if (oauthError) {
+      console.error(oauthError)
+      setAuthError(oauthError.message || 'Google 로그인에 실패했습니다.')
+      setAuthBusy(false)
+    }
+  }
+
+  async function handleLogout() {
+    setAuthBusy(true)
+    setAuthError('')
+    const { error: signOutError } = await supabase.auth.signOut()
+    if (signOutError) {
+      console.error(signOutError)
+      setAuthError(signOutError.message || '로그아웃에 실패했습니다.')
+      setAuthBusy(false)
+      return
+    }
+    clearFormFields()
+    setResult('')
+    setSelectedId(null)
+    setSelectedName('')
+    setReadings([])
+    setAuthBusy(false)
+  }
+
+  async function handleSaveProfile(payload) {
+    if (!user) return
+    setProfileBusy(true)
+    setProfileError('')
+
+    const { error: refreshError } = await supabase.auth.refreshSession()
+    if (refreshError) {
+      console.error(refreshError)
+      setProfileError(
+        formatSupabaseError(
+          refreshError,
+          '로그인 세션을 갱신하지 못했습니다. 다시 로그인해 주세요.',
+        ),
+      )
+      setProfileBusy(false)
+      return
+    }
+
+    const isEdit = Boolean(showProfileEdit && profile?.id)
+    let data = null
+    let saveError = null
+
+    if (isEdit) {
+      const result = await supabase
+        .from('profiles')
+        .update({
+          ...payload,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', profile.id)
+        .eq('owner_id', user.id)
+        .select(PROFILE_FIELDS)
+        .single()
+      data = result.data
+      saveError = result.error
+    } else {
+      const result = await supabase
+        .from('profiles')
+        .insert({
+          owner_id: user.id,
+          ...payload,
+          updated_at: new Date().toISOString(),
+        })
+        .select(PROFILE_FIELDS)
+        .single()
+      data = result.data
+      saveError = result.error
+    }
+
+    if (saveError) {
+      console.error(saveError)
+      setProfileError(
+        formatSupabaseError(saveError, '프로필 저장에 실패했습니다.'),
+      )
+      setProfileBusy(false)
+      return
+    }
+
+    const nextList = isEdit
+      ? profiles.map((item) => (item.id === data.id ? data : item))
+      : [...profiles, data]
+
+    setProfiles(nextList)
+    setProfile(data)
+    window.localStorage.setItem(SELECTED_PROFILE_KEY, data.id)
+    setShowOnboarding(false)
+    setShowProfileCreate(false)
+    setShowProfileEdit(false)
+    setProfileBusy(false)
+
+    if (!selectedId) {
+      applyProfileToForm(data)
+      loadedSnapshotRef.current = ''
+    }
+  }
 
   useEffect(() => {
     if (birthMonth && birthMonth > maxMonth) {
@@ -299,10 +584,12 @@ function App() {
   }, [showMissing, missing.name, missing.birthDate, missing.gender, missing.calendarType])
 
   useEffect(() => {
-    if (!warning) return undefined
+    if (!warning && !deleteTarget) return undefined
 
     function onKeyDown(event) {
-      if (event.key === 'Escape') setWarning(false)
+      if (event.key !== 'Escape') return
+      if (deleteTarget && !deleteBusy) setDeleteTarget(null)
+      else if (warning) setWarning(false)
     }
 
     document.body.style.overflow = 'hidden'
@@ -311,7 +598,7 @@ function App() {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', onKeyDown)
     }
-  }, [warning])
+  }, [warning, deleteTarget, deleteBusy])
 
   useEffect(() => {
     if (!loading) return undefined
@@ -375,7 +662,7 @@ function App() {
   }
 
   function handleNewReading() {
-    clearFormFields()
+    applyProfileToForm()
     setResult('')
     setSelectedId(null)
     setSelectedName('')
@@ -395,6 +682,17 @@ function App() {
 
   async function handleAnalyze() {
     setError('')
+
+    if (!user) {
+      setAuthError('Google로 로그인한 뒤 사주를 풀어주세요.')
+      return
+    }
+
+    if (!profile) {
+      setShowOnboarding(true)
+      setProfileError('먼저 명식을 등록해 주세요.')
+      return
+    }
 
     if (!isFormComplete()) {
       setShowMissing(true)
@@ -432,6 +730,8 @@ function App() {
         gender,
         calendar_type: calendarType,
         result: text,
+        user_id: user.id,
+        profile_id: profile?.id || null,
       }
 
       if (editingId) {
@@ -482,12 +782,23 @@ function App() {
     }
   }
 
-  async function handleDeleteReading(readingId) {
-    if (!readingId) return
-    const confirmed = window.confirm('이 사주 기록을 삭제할까요?')
-    if (!confirmed) return
+  function requestDeleteReading(readingId) {
+    if (!readingId || deleteBusy) return
+    const reading = readings.find((item) => item.id === readingId)
+    const targetName =
+      reading?.name ||
+      (selectedId === readingId ? selectedName : '') ||
+      '이 사주'
+    setDeleteTarget({ id: readingId, name: targetName })
+  }
 
+  async function confirmDeleteReading() {
+    if (!deleteTarget?.id || deleteBusy) return
+
+    const readingId = deleteTarget.id
+    setDeleteBusy(true)
     setError('')
+
     const { error: deleteError } = await supabase
       .from('saju_readings')
       .delete()
@@ -495,10 +806,14 @@ function App() {
 
     if (deleteError) {
       setError(deleteError.message || '사주 기록 삭제에 실패했습니다.')
+      setDeleteBusy(false)
+      setDeleteTarget(null)
       return
     }
 
     setReadings((prev) => prev.filter((reading) => reading.id !== readingId))
+    setDeleteBusy(false)
+    setDeleteTarget(null)
     if (selectedId === readingId) {
       handleNewReading()
     }
@@ -506,6 +821,42 @@ function App() {
 
   function fieldClass(isIncomplete) {
     return showMissing && isIncomplete ? 'field is-missing' : 'field'
+  }
+
+  if (!authReady || !user) {
+    return (
+      <div className="page page-gate">
+        <div className="atmosphere" aria-hidden="true" />
+        <div className="gate-veil" aria-hidden="true" />
+
+        <main className="gate" aria-label="로그인">
+          <p className="gate-eyebrow">전통 명식 · 운명 해석</p>
+          <h1 className="gate-brand">백 선생의 사주</h1>
+          <p className="gate-lede">
+            생시와 명식을 아뢰면, 담담하고 또렷하게 천기를 풀어 드립니다.
+          </p>
+
+          {!authReady ? (
+            <p className="gate-status" role="status">
+              문 앞에서 신명을 확인하는 중...
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="gate-cta"
+              onClick={handleGoogleLogin}
+              disabled={authBusy}
+            >
+              {authBusy ? '문을 여는 중...' : 'Google로 들어가기'}
+            </button>
+          )}
+
+          {authError ? <p className="gate-error">{authError}</p> : null}
+
+          <p className="gate-foot">로그인 후 명식을 등록하면 사주를 볼 수 있습니다.</p>
+        </main>
+      </div>
+    )
   }
 
   return (
@@ -556,8 +907,173 @@ function App() {
         </div>
       )}
 
+      {deleteTarget && (
+        <div
+          className="omen-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-omen-title"
+          onClick={() => {
+            if (!deleteBusy) setDeleteTarget(null)
+          }}
+        >
+          <div
+            className="omen-warning omen-delete"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <p id="delete-omen-title" className="omen-title">
+              명부의 소각
+            </p>
+            <p className="omen-text">
+              <strong>{deleteTarget.name}</strong>의 사주가
+              <br />
+              명부에서 영원히 지워지리라.
+              <br />
+              한 번 태운 글은 되돌릴 수 없다.
+              <br />
+              참으로 소각할 것인가?
+            </p>
+            <div className="omen-actions">
+              <button
+                type="button"
+                className="omen-keep"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleteBusy}
+              >
+                아직 두지 않으리
+              </button>
+              <button
+                type="button"
+                className="omen-burn"
+                onClick={confirmDeleteReading}
+                disabled={deleteBusy}
+              >
+                {deleteBusy ? '소각하는 중...' : '명부에서 태우리'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ProfileModal
+        mode="onboarding"
+        open={Boolean(user && profileReady && showOnboarding)}
+        initialProfile={null}
+        busy={profileBusy}
+        error={profileError}
+        onSave={handleSaveProfile}
+        onClose={() => {
+          setShowOnboarding(false)
+          setProfileError('')
+        }}
+      />
+
+      <ProfileModal
+        mode="create"
+        open={Boolean(user && showProfileCreate)}
+        initialProfile={null}
+        busy={profileBusy}
+        error={profileError}
+        onSave={handleSaveProfile}
+        onClose={() => {
+          setShowProfileCreate(false)
+          setProfileError('')
+        }}
+      />
+
+      <ProfileModal
+        mode="edit"
+        open={Boolean(user && showProfileEdit)}
+        initialProfile={profile}
+        busy={profileBusy}
+        error={profileError}
+        onSave={handleSaveProfile}
+        onClose={() => {
+          setShowProfileEdit(false)
+          setProfileError('')
+        }}
+      />
+
       <div className="layout">
         <aside className="sidebar" aria-label="저장된 사주 목록">
+          <div className="auth-box">
+            <p className="auth-status">
+              {user.user_metadata?.full_name ||
+                user.user_metadata?.name ||
+                user.email ||
+                '로그인됨'}
+            </p>
+
+            {profiles.length > 0 ? (
+              <>
+                <label className="profile-select-label" htmlFor="profile-select">
+                  프로필 선택
+                </label>
+                <select
+                  id="profile-select"
+                  className="profile-select"
+                  value={profile?.id || ''}
+                  onChange={(event) => handleSelectProfile(event.target.value)}
+                  disabled={profileBusy}
+                >
+                  {profiles.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                {profile ? (
+                  <p className="auth-meta">
+                    {[
+                      formatBirthDateLabel(profile.birth_date),
+                      profile.gender,
+                      profile.calendar_type,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                ) : null}
+              </>
+            ) : profileReady ? (
+              <p className="auth-meta">명식 미등록 · 프로필을 추가하세요</p>
+            ) : (
+              <p className="auth-meta">명식 불러오는 중...</p>
+            )}
+
+            <button
+              type="button"
+              className="auth-button auth-button-google"
+              onClick={() => {
+                setProfileError('')
+                if (profiles.length === 0) setShowOnboarding(true)
+                else setShowProfileCreate(true)
+              }}
+              disabled={!profileReady || profileBusy}
+            >
+              프로필 추가
+            </button>
+            <button
+              type="button"
+              className="auth-button"
+              onClick={() => {
+                setProfileError('')
+                setShowProfileEdit(true)
+              }}
+              disabled={!profileReady || !profile || profileBusy}
+            >
+              프로필 수정
+            </button>
+            <button
+              type="button"
+              className="auth-button auth-button-ghost"
+              onClick={handleLogout}
+              disabled={authBusy}
+            >
+              {authBusy ? '처리 중...' : '로그아웃'}
+            </button>
+            {authError ? <p className="auth-error">{authError}</p> : null}
+          </div>
+
           <h2 className="sidebar-title">명부</h2>
           <p className="sidebar-lede">
             {listLoading
@@ -566,12 +1082,18 @@ function App() {
                 ? `저장된 사주 · ${readings.length}명`
                 : '저장된 사주'}
           </p>
+          {!listLoading && !listError && readings.length === 0 ? (
+            <p className="sidebar-empty sidebar-empty-above">
+              아직 기록된 이름이 없습니다.
+            </p>
+          ) : null}
           <button
             type="button"
             className="sidebar-new"
             onClick={handleNewReading}
+            disabled={!profile}
           >
-            새 사주 만들기
+            새 사주 보기
           </button>
           {listError ? (
             <div className="sidebar-empty-wrap">
@@ -586,9 +1108,7 @@ function App() {
             </div>
           ) : listLoading ? (
             <p className="sidebar-empty">명부를 펼치는 중...</p>
-          ) : readings.length === 0 ? (
-            <p className="sidebar-empty">아직 기록된 이름이 없습니다.</p>
-          ) : (
+          ) : readings.length > 0 ? (
             <ul className="sidebar-list">
               {readings.map((reading) => (
                 <li key={reading.id} className="sidebar-item">
@@ -614,7 +1134,7 @@ function App() {
                     aria-label={`${reading.name} 기록 삭제`}
                     onClick={(event) => {
                       event.stopPropagation()
-                      handleDeleteReading(reading.id)
+                      requestDeleteReading(reading.id)
                     }}
                   >
                     삭제
@@ -622,7 +1142,7 @@ function App() {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </aside>
 
         <main className="shell">
@@ -630,7 +1150,9 @@ function App() {
             <p className="eyebrow">전통 명식 · 운명 해석</p>
             <h1 className="brand">백 선생의 사주</h1>
             <p className="lede">
-              생시와 명식을 바탕으로, 담담하고 또렷하게 풀이합니다.
+              {profile
+                ? `${profile.name}님의 명식을 불러와 풀이합니다.`
+                : '생시와 명식을 바탕으로, 담담하고 또렷하게 풀이합니다.'}
             </p>
           </header>
 
@@ -638,6 +1160,51 @@ function App() {
             className={isViewing ? 'panel is-viewing' : 'panel'}
             aria-label="사주 입력"
           >
+            {user && profiles.length > 0 && !isViewing && (
+              <p className="profile-note">
+                지금 선택된 프로필은 <strong>{profile?.name}</strong>입니다.
+                <button
+                  type="button"
+                  className="profile-note-link"
+                  onClick={() => {
+                    setProfileError('')
+                    setShowProfileCreate(true)
+                  }}
+                >
+                  프로필을 추가
+                </button>
+                하거나
+                <button
+                  type="button"
+                  className="profile-note-link"
+                  onClick={() => {
+                    setProfileError('')
+                    setShowProfileEdit(true)
+                  }}
+                >
+                  프로필을 수정
+                </button>
+                할 수 있습니다.
+              </p>
+            )}
+
+            {user && profiles.length === 0 && profileReady && !isViewing && (
+              <p className="profile-note">
+                아직 저장된 명식이 없습니다.
+                <button
+                  type="button"
+                  className="profile-note-link"
+                  onClick={() => {
+                    setProfileError('')
+                    setShowOnboarding(true)
+                  }}
+                >
+                  프로필 추가
+                </button>
+                로 생시와 명식을 등록해 주세요.
+              </p>
+            )}
+
             {isViewing && (
               <p className="viewing-note">
                 명부에서 <strong>{selectedName}</strong>님의 풀이를 열람 중입니다.
@@ -863,24 +1430,41 @@ function App() {
               {name ? `${name}님의 사주` : '새 사주를 적어 주세요'}
             </p>
 
-            <button
-              type="button"
-              className="cta"
-              onClick={handleAnalyze}
-              disabled={loading}
-            >
-              {loading
-                ? '천기를 읽는 중...'
-                : selectedId
-                  ? '다시 풀어보기'
-                  : '내 사주 보기'}
-            </button>
+            <div className="cta-row">
+              <button
+                type="button"
+                className="cta"
+                onClick={handleAnalyze}
+                disabled={loading || !user || !profile}
+              >
+                {loading
+                  ? '천기를 읽는 중...'
+                  : !user
+                    ? '로그인 후 사주 보기'
+                    : !profile
+                      ? '명식 등록 후 사주 보기'
+                      : selectedId
+                        ? '다시 풀어보기'
+                        : '내 사주 보기'}
+              </button>
+
+              {(selectedId || result) && (
+                <button
+                  type="button"
+                  className="cta-new"
+                  onClick={handleNewReading}
+                  disabled={loading || !profile}
+                >
+                  새 사주 보기
+                </button>
+              )}
+            </div>
 
             {selectedId && (
               <button
                 type="button"
                 className="cta-delete"
-                onClick={() => handleDeleteReading(selectedId)}
+                onClick={() => requestDeleteReading(selectedId)}
                 disabled={loading}
               >
                 이 기록 삭제
