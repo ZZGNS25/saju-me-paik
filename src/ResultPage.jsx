@@ -34,6 +34,7 @@ export default function ResultPage() {
 
   useEffect(() => {
     if (!shareNote) return undefined
+    if (shareNote === '공유 창을 열었습니다.') return undefined
     const timer = window.setTimeout(() => setShareNote(''), 3200)
     return () => window.clearTimeout(timer)
   }, [shareNote])
@@ -111,8 +112,9 @@ export default function ResultPage() {
           if (err?.name !== 'AbortError') {
             throw err
           }
+        } finally {
+          setShareNote('')
         }
-        setShareNote('')
         return
       }
       await navigator.clipboard.writeText(url)

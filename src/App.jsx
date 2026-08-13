@@ -494,6 +494,7 @@ function App() {
 
   useEffect(() => {
     if (!shareNote) return undefined
+    if (shareNote === '공유 창을 열었습니다.') return undefined
     const timer = window.setTimeout(() => setShareNote(''), 3200)
     return () => window.clearTimeout(timer)
   }, [shareNote])
@@ -984,10 +985,9 @@ function App() {
           if (err?.name !== 'AbortError') {
             throw err
           }
+        } finally {
+          setShareNote('')
         }
-        // 성공/취소 모두 창이 닫힌 뒤라서, 열림 안내만 제거
-        // (일부 브라우저는 공유하지 않아도 resolve 됨)
-        setShareNote('')
       } else {
         await navigator.clipboard.writeText(shareUrl)
         setShareNote('공유 링크를 복사했습니다.')
