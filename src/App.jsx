@@ -10,7 +10,6 @@ const PROFILE_FIELDS =
   'id, owner_id, name, birth_date, period, hour, minute, gender, calendar_type, created_at, updated_at'
 const SELECTED_PROFILE_KEY = 'saju-me-selected-profile'
 const PENDING_READING_KEY = 'saju-me-pending-reading'
-const ENTERED_KEY = 'saju-me-entered'
 
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1))
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) =>
@@ -125,13 +124,7 @@ function App() {
   const [shareBusy, setShareBusy] = useState(false)
   const [shareNote, setShareNote] = useState('')
   const [readingCount, setReadingCount] = useState(null)
-  const [hasEntered, setHasEntered] = useState(() => {
-    try {
-      return window.sessionStorage.getItem(ENTERED_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
+  const [hasEntered, setHasEntered] = useState(false)
   const loadedSnapshotRef = useRef('')
   const pendingRestoreRef = useRef(false)
 
@@ -1085,14 +1078,9 @@ function App() {
   const lockedParts = isResultLocked
     ? getLockedResultParts(result)
     : { visible: resultParagraphs(result), hidden: [] }
-  const showWelcomeGate = authReady && !user && !hasEntered
+  const showWelcomeGate = !hasEntered
 
   function handleEnterApp() {
-    try {
-      window.sessionStorage.setItem(ENTERED_KEY, '1')
-    } catch {
-      // ignore
-    }
     setHasEntered(true)
   }
 
