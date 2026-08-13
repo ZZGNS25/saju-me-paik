@@ -107,14 +107,12 @@ export default function ResultPage() {
             text: '백 선생이 풀어 준 사주를 확인해 보세요.',
             url,
           })
-          setShareNote('공유했습니다.')
         } catch (err) {
-          if (err?.name === 'AbortError') {
-            setShareNote('')
-          } else {
+          if (err?.name !== 'AbortError') {
             throw err
           }
         }
+        setShareNote('')
         return
       }
       await navigator.clipboard.writeText(url)
