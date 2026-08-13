@@ -33,6 +33,12 @@ export default function ResultPage() {
   const [shareNote, setShareNote] = useState('')
 
   useEffect(() => {
+    if (!shareNote) return undefined
+    const timer = window.setTimeout(() => setShareNote(''), 3200)
+    return () => window.clearTimeout(timer)
+  }, [shareNote])
+
+  useEffect(() => {
     let mounted = true
 
     async function load() {
@@ -93,20 +99,24 @@ export default function ResultPage() {
   async function handleShareAgain() {
     const url = window.location.href
     try {
-      if (navigator.share) {
+      await navigator.clipboard.writeText(url)
+      setShareNote('링크를 복사했습니다.')
+    } catch {
+      setShareNote('주소창의 링크를 복사해 주세요.')
+    }
+
+    if (navigator.share) {
+      try {
         await navigator.share({
           title: reading ? `${reading.name}님의 사주` : '백 선생의 사주',
           text: '백 선생이 풀어 준 사주를 확인해 보세요.',
           url,
         })
-        setShareNote('공유 창을 열었습니다.')
-        return
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error(err)
+        }
       }
-      await navigator.clipboard.writeText(url)
-      setShareNote('링크를 복사했습니다.')
-    } catch (err) {
-      if (err?.name === 'AbortError') return
-      setShareNote('공유에 실패했습니다. 주소창의 링크를 복사해 주세요.')
     }
   }
 

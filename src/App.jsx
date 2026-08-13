@@ -493,6 +493,12 @@ function App() {
   }, [authReady, user?.id])
 
   useEffect(() => {
+    if (!shareNote) return undefined
+    const timer = window.setTimeout(() => setShareNote(''), 3200)
+    return () => window.clearTimeout(timer)
+  }, [shareNote])
+
+  useEffect(() => {
     let cancelled = false
 
     async function loadReadingCount() {
@@ -970,25 +976,24 @@ function App() {
     const text = '백 선생이 풀어 준 사주를 확인해 보세요.'
 
     try {
-      if (navigator.share) {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareNote('공유 링크를 복사했습니다.')
+    } catch {
+      setShareNote(`이 링크를 복사해 공유하세요: ${shareUrl}`)
+    }
+
+    if (navigator.share) {
+      try {
         await navigator.share({ title, text, url: shareUrl })
-        setShareNote('공유 창을 열었습니다.')
-      } else {
-        await navigator.clipboard.writeText(shareUrl)
-        setShareNote('공유 링크를 복사했습니다.')
-      }
-    } catch (err) {
-      if (err?.name !== 'AbortError') {
-        try {
-          await navigator.clipboard.writeText(shareUrl)
-          setShareNote('공유 링크를 복사했습니다.')
-        } catch {
-          setShareNote(`이 링크를 복사해 공유하세요: ${shareUrl}`)
+      } catch (err) {
+        // 공유 창을 닫거나 취소한 경우는 무시 (복사 안내 유지)
+        if (err?.name !== 'AbortError') {
+          console.error(err)
         }
       }
-    } finally {
-      setShareBusy(false)
     }
+
+    setShareBusy(false)
   }
 
   useEffect(() => {
