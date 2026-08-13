@@ -26,7 +26,7 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) =>
 )
 
 const READING_FIELDS =
-  'id, name, birth_date, period, hour, minute, gender, calendar_type, result, created_at, profile_id'
+  'id, name, birth_date, period, hour, minute, gender, calendar_type, result, created_at, profile_id, share_token, is_shared'
 
 function daysInMonth(year, month) {
   if (!year || !month) return 31
@@ -120,6 +120,8 @@ function App() {
   const [profileError, setProfileError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareNote, setShareNote] = useState('')
   const loadedSnapshotRef = useRef('')
 
   const birthTimeText = formatBirthTime({ period, hour, minute })
@@ -627,6 +629,7 @@ function App() {
       handleNewReading()
       return
     }
+    setShareNote('')
 
     const nextName = reading.name || ''
     const nextBirth = reading.birth_date || ''
@@ -667,6 +670,7 @@ function App() {
     setSelectedId(null)
     setSelectedName('')
     setError('')
+    setShareNote('')
     setWarning(false)
     setShowMissing(false)
     loadedSnapshotRef.current = ''
@@ -816,6 +820,65 @@ function App() {
     setDeleteTarget(null)
     if (selectedId === readingId) {
       handleNewReading()
+    }
+  }
+
+  async function handleShareReading() {
+    if (!selectedId || shareBusy) return
+
+    setShareBusy(true)
+    setShareNote('')
+    setError('')
+
+    const current = readings.find((item) => item.id === selectedId)
+    let shareToken = current?.share_token
+
+    if (!current?.is_shared || !shareToken) {
+      const { data, error: shareError } = await supabase
+        .from('saju_readings')
+        .update({ is_shared: true })
+        .eq('id', selectedId)
+        .select(READING_FIELDS)
+        .single()
+
+      if (shareError) {
+        console.error(shareError)
+        setError(
+          formatSupabaseError(shareError, '공유 링크를 만들지 못했습니다.'),
+        )
+        setShareBusy(false)
+        return
+      }
+
+      shareToken = data.share_token
+      setReadings((prev) =>
+        prev.map((reading) => (reading.id === data.id ? data : reading)),
+      )
+    }
+
+    const shareUrl = `${window.location.origin}/result/${shareToken}`
+    const title = `${selectedName || name || '사주'}님의 사주`
+    const text = '백 선생이 풀어 준 사주를 확인해 보세요.'
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text, url: shareUrl })
+        setShareNote('공유 창을 열었습니다.')
+      } else {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareNote('공유 링크를 복사했습니다.')
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(shareUrl)
+          setShareNote('공유 링크를 복사했습니다.')
+        } catch {
+          setShareNote(`이 링크를 복사해 공유하세요: ${shareUrl}`)
+        }
+      }
+    } finally {
+      setShareBusy(false)
     }
   }
 
@@ -1496,6 +1559,20 @@ function App() {
                   <p key={`${selectedId || 'live'}-${index}`}>{paragraph}</p>
                 ))}
               </div>
+
+              {selectedId && (
+                <div className="share-actions">
+                  <button
+                    type="button"
+                    className="cta-share"
+                    onClick={handleShareReading}
+                    disabled={shareBusy || loading}
+                  >
+                    {shareBusy ? '링크 준비 중...' : '친구에게 공유하기'}
+                  </button>
+                  {shareNote ? <p className="share-note">{shareNote}</p> : null}
+                </div>
+              )}
             </section>
           )}
         </main>
