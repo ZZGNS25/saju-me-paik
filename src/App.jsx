@@ -466,6 +466,7 @@ function App() {
       }
       if (event === 'SIGNED_OUT') {
         setAuthBusy(false)
+        setHasEntered(false)
         setProfile(null)
         setProfiles([])
         setProfileReady(false)
@@ -562,6 +563,7 @@ function App() {
     setSelectedId(null)
     setSelectedName('')
     setReadings([])
+    setHasEntered(false)
     setAuthBusy(false)
   }
 
