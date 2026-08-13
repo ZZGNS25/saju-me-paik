@@ -99,24 +99,28 @@ export default function ResultPage() {
   async function handleShareAgain() {
     const url = window.location.href
     try {
+      if (navigator.share) {
+        setShareNote('공유 창을 열었습니다.')
+        try {
+          await navigator.share({
+            title: reading ? `${reading.name}님의 사주` : '백 선생의 사주',
+            text: '백 선생이 풀어 준 사주를 확인해 보세요.',
+            url,
+          })
+          setShareNote('공유했습니다.')
+        } catch (err) {
+          if (err?.name === 'AbortError') {
+            setShareNote('')
+          } else {
+            throw err
+          }
+        }
+        return
+      }
       await navigator.clipboard.writeText(url)
       setShareNote('링크를 복사했습니다.')
     } catch {
-      setShareNote('주소창의 링크를 복사해 주세요.')
-    }
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: reading ? `${reading.name}님의 사주` : '백 선생의 사주',
-          text: '백 선생이 풀어 준 사주를 확인해 보세요.',
-          url,
-        })
-      } catch (err) {
-        if (err?.name !== 'AbortError') {
-          console.error(err)
-        }
-      }
+      setShareNote('공유에 실패했습니다. 주소창의 링크를 복사해 주세요.')
     }
   }
 
