@@ -1,82 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-
-const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1))
-const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) =>
-  String(i).padStart(2, '0'),
-)
-const TODAY = new Date()
-const CURRENT_YEAR = TODAY.getFullYear()
-const YEAR_OPTIONS = Array.from(
-  { length: CURRENT_YEAR - 1900 + 1 },
-  (_, i) => String(CURRENT_YEAR - i),
-)
-const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) =>
-  String(i + 1).padStart(2, '0'),
-)
-
-function daysInMonth(year, month) {
-  if (!year || !month) return 31
-  return new Date(Number(year), Number(month), 0).getDate()
-}
-
-function splitBirthDate(value) {
-  if (!value) return { year: '', month: '', day: '' }
-  const [year = '', month = '', day = ''] = String(value).split('-')
-  return { year, month, day }
-}
-
-function formatBirthDateLabel(value) {
-  if (!value) return ''
-  const [y, m, d] = value.split('-')
-  if (!y || !m || !d) return value
-  return `${y}년 ${Number(m)}월 ${Number(d)}일`
-}
-
-function emptyForm() {
-  return {
-    name: '',
-    birthYear: '',
-    birthMonth: '',
-    birthDay: '',
-    period: '',
-    hour: '',
-    minute: '',
-    gender: '',
-    calendarType: '',
-  }
-}
-
-function formFromProfile(profile) {
-  if (!profile) return emptyForm()
-  const { year, month, day } = splitBirthDate(profile.birth_date)
-  return {
-    name: profile.name || '',
-    birthYear: year,
-    birthMonth: month,
-    birthDay: day,
-    period: profile.period || '',
-    hour: profile.hour || '',
-    minute: profile.minute || '',
-    gender: profile.gender || '',
-    calendarType: profile.calendar_type || '',
-  }
-}
-
-export function profileToFormValues(profile) {
-  if (!profile) return null
-  const { year, month, day } = splitBirthDate(profile.birth_date)
-  return {
-    name: profile.name || '',
-    birthYear: year,
-    birthMonth: month,
-    birthDay: day,
-    period: profile.period || '',
-    hour: profile.hour || '',
-    minute: profile.minute || '',
-    gender: profile.gender || '',
-    calendarType: profile.calendar_type || '',
-  }
-}
+import { HOUR_OPTIONS, MINUTE_OPTIONS } from '../../lib/constants'
+import {
+  YEAR_OPTIONS,
+  formatBirthDateLabel,
+  getDateSelectOptions,
+} from '../../lib/date'
+import { fieldClass } from '../../lib/dom'
+import { emptyProfileForm, formFromProfile } from '../../lib/profileForm'
 
 export default function ProfileModal({
   mode = 'onboarding',
@@ -87,7 +17,7 @@ export default function ProfileModal({
   onSave,
   onClose,
 }) {
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState(emptyProfileForm)
   const [showMissing, setShowMissing] = useState(false)
 
   useEffect(() => {
@@ -96,18 +26,9 @@ export default function ProfileModal({
     setShowMissing(false)
   }, [open, initialProfile])
 
-  const maxMonth =
-    form.birthYear === String(CURRENT_YEAR)
-      ? String(TODAY.getMonth() + 1).padStart(2, '0')
-      : '12'
-  const monthOptions = MONTH_OPTIONS.filter((month) => month <= maxMonth)
-  const maxDay =
-    form.birthYear === String(CURRENT_YEAR) &&
-    form.birthMonth === String(TODAY.getMonth() + 1).padStart(2, '0')
-      ? TODAY.getDate()
-      : daysInMonth(form.birthYear, form.birthMonth)
-  const dayOptions = Array.from({ length: maxDay }, (_, i) =>
-    String(i + 1).padStart(2, '0'),
+  const { monthOptions, dayOptions } = getDateSelectOptions(
+    form.birthYear,
+    form.birthMonth,
   )
 
   const birthDate =
@@ -129,8 +50,8 @@ export default function ProfileModal({
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  function fieldClass(isIncomplete) {
-    return showMissing && isIncomplete ? 'field is-missing' : 'field'
+  function getFieldClass(isIncomplete) {
+    return fieldClass(showMissing, isIncomplete)
   }
 
   function handleSubmit(event) {
@@ -196,7 +117,7 @@ export default function ProfileModal({
         <p className="profile-modal-lede">{lede}</p>
 
         <form className="profile-form" onSubmit={handleSubmit}>
-          <div className={fieldClass(missing.name)}>
+          <div className={getFieldClass(missing.name)}>
             <div className="field-head">
               <label htmlFor="profile-name">이름</label>
               <span className="live">{form.name}</span>
@@ -212,7 +133,7 @@ export default function ProfileModal({
             />
           </div>
 
-          <div className={fieldClass(missing.birthDate)}>
+          <div className={getFieldClass(missing.birthDate)}>
             <div className="field-head">
               <span className="label-text" id="profile-birth-label">
                 생년월일
@@ -315,7 +236,7 @@ export default function ProfileModal({
           </div>
 
           <div className="field-grid">
-            <div className={fieldClass(missing.gender)}>
+            <div className={getFieldClass(missing.gender)}>
               <div className="field-head">
                 <label htmlFor="profile-gender">성별</label>
               </div>
@@ -330,7 +251,7 @@ export default function ProfileModal({
                 <option value="여성">여성</option>
               </select>
             </div>
-            <div className={fieldClass(missing.calendarType)}>
+            <div className={getFieldClass(missing.calendarType)}>
               <div className="field-head">
                 <label htmlFor="profile-calendar">양력/음력</label>
               </div>

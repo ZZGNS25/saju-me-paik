@@ -1,3 +1,5 @@
+import { formatBirthTime } from './date'
+
 // 사주 기본차트 해석용 프롬프트를 만듭니다.
 // (지금은 명식/대운 등 차트 데이터는 예시 값을 사용합니다)
 
@@ -18,15 +20,6 @@ function toPromptGender(gender) {
   if (gender === '남성') return 'male'
   if (gender === '여성') return 'female'
   return gender || 'unknown'
-}
-
-// 오전/오후·시·분을 따로 받아 표시합니다 (미선택: --)
-export function formatBirthTime({ period = '', hour = '', minute = '' } = {}) {
-  if (!period && !hour && !minute) return '--:--'
-  const hourText = hour ? String(hour).padStart(2, '0') : '--'
-  const minuteText = minute ? String(minute).padStart(2, '0') : '--'
-  const clock = `${hourText}:${minuteText}`
-  return period ? `${period} ${clock}` : clock
 }
 
 export function buildSajuPrompt({
