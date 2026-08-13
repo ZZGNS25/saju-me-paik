@@ -9,6 +9,8 @@ import ProfileModal, { profileToFormValues } from './ProfileModal'
 const PROFILE_FIELDS =
   'id, owner_id, name, birth_date, period, hour, minute, gender, calendar_type, created_at, updated_at'
 const SELECTED_PROFILE_KEY = 'saju-me-selected-profile'
+const PENDING_READING_KEY = 'saju-me-pending-reading'
+const ENTERED_KEY = 'saju-me-entered'
 
 const HOUR_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i + 1))
 const MINUTE_OPTIONS = Array.from({ length: 60 }, (_, i) =>
@@ -122,7 +124,16 @@ function App() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareNote, setShareNote] = useState('')
+  const [readingCount, setReadingCount] = useState(null)
+  const [hasEntered, setHasEntered] = useState(() => {
+    try {
+      return window.sessionStorage.getItem(ENTERED_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const loadedSnapshotRef = useRef('')
+  const pendingRestoreRef = useRef(false)
 
   const birthTimeText = formatBirthTime({ period, hour, minute })
   const maxMonth =
@@ -199,6 +210,52 @@ function App() {
       .split(/\n{2,}/)
       .map((part) => part.replace(/\n/g, ' ').trim())
       .filter(Boolean)
+  }
+
+  function getLockedResultParts(text) {
+    const paragraphs = resultParagraphs(text)
+    if (paragraphs.length === 0) {
+      return { visible: [], hidden: [] }
+    }
+    if (paragraphs.length === 1) {
+      const full = paragraphs[0]
+      const cut = Math.max(40, Math.floor(full.length * 0.45))
+      return {
+        visible: [full.slice(0, cut).trimEnd() + '…'],
+        hidden: [full],
+      }
+    }
+    const visibleCount = Math.max(1, Math.ceil(paragraphs.length / 2))
+    return {
+      visible: paragraphs.slice(0, visibleCount),
+      hidden: paragraphs.slice(visibleCount),
+    }
+  }
+
+  function savePendingReading(snapshot) {
+    try {
+      window.sessionStorage.setItem(PENDING_READING_KEY, JSON.stringify(snapshot))
+    } catch {
+      // sessionStorage 불가 시 무시
+    }
+  }
+
+  function readPendingReading() {
+    try {
+      const raw = window.sessionStorage.getItem(PENDING_READING_KEY)
+      if (!raw) return null
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+
+  function clearPendingReading() {
+    try {
+      window.sessionStorage.removeItem(PENDING_READING_KEY)
+    } catch {
+      // ignore
+    }
   }
 
   function applyBirthDate(value) {
@@ -453,9 +510,45 @@ function App() {
     loadProfiles(user)
   }, [authReady, user?.id])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadReadingCount() {
+      const { data, error: countError } = await supabase.rpc(
+        'get_saju_reading_count',
+      )
+      if (cancelled) return
+      if (countError) {
+        setReadingCount(null)
+        return
+      }
+      const next = Number(data)
+      setReadingCount(Number.isFinite(next) ? next : null)
+    }
+
+    loadReadingCount()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   async function handleGoogleLogin() {
     setAuthBusy(true)
     setAuthError('')
+
+    if (result) {
+      savePendingReading({
+        name,
+        birthDate,
+        period,
+        hour,
+        minute,
+        gender,
+        calendarType,
+        result,
+      })
+    }
+
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -665,7 +758,8 @@ function App() {
   }
 
   function handleNewReading() {
-    applyProfileToForm()
+    if (profile) applyProfileToForm()
+    else clearFormFields()
     setResult('')
     setSelectedId(null)
     setSelectedName('')
@@ -674,6 +768,7 @@ function App() {
     setWarning(false)
     setShowMissing(false)
     loadedSnapshotRef.current = ''
+    clearPendingReading()
 
     requestAnimationFrame(() => {
       document.getElementById('name')?.focus()
@@ -684,19 +779,55 @@ function App() {
     })
   }
 
+  async function persistReading({
+    text,
+    editingId = null,
+    values,
+    nextUser = user,
+    nextProfile = profile,
+  }) {
+    if (!nextUser) return null
+
+    const payload = {
+      name: values.name.trim(),
+      birth_date: values.birthDate,
+      period: values.period || null,
+      hour: values.hour || null,
+      minute: values.minute || null,
+      gender: values.gender,
+      calendar_type: values.calendarType,
+      result: text,
+      user_id: nextUser.id,
+      profile_id: nextProfile?.id || null,
+    }
+
+    if (editingId) {
+      const { data, error: updateError } = await supabase
+        .from('saju_readings')
+        .update(payload)
+        .eq('id', editingId)
+        .select(READING_FIELDS)
+        .single()
+      if (updateError) {
+        throw new Error(updateError.message || '사주 결과 수정에 실패했습니다.')
+      }
+      return data
+    }
+
+    const { data, error: saveError } = await supabase
+      .from('saju_readings')
+      .insert(payload)
+      .select(READING_FIELDS)
+      .single()
+    if (saveError) {
+      throw new Error(saveError.message || '사주 결과 저장에 실패했습니다.')
+    }
+    return data
+  }
+
   async function handleAnalyze() {
     setError('')
-
-    if (!user) {
-      setAuthError('Google로 로그인한 뒤 사주를 풀어주세요.')
-      return
-    }
-
-    if (!profile) {
-      setShowOnboarding(true)
-      setProfileError('먼저 명식을 등록해 주세요.')
-      return
-    }
+    setAuthError('')
 
     if (!isFormComplete()) {
       setShowMissing(true)
@@ -705,72 +836,67 @@ function App() {
       return
     }
 
-    const editingId = selectedId
+    if (user && !profile) {
+      setShowOnboarding(true)
+      setProfileError('저장하려면 먼저 명식 프로필을 등록해 주세요.')
+    }
+
+    const editingId = user && profile ? selectedId : null
     setResult('')
     setShowMissing(false)
     setWarning(false)
     setLoading(true)
 
+    const values = {
+      name,
+      birthDate,
+      period,
+      hour,
+      minute,
+      gender,
+      calendarType,
+    }
+
     try {
-      const prompt = buildSajuPrompt({
-        name,
-        birthDate,
-        period,
-        hour,
-        minute,
-        gender,
-        calendarType,
-      })
+      const prompt = buildSajuPrompt(values)
       const text = normalizeResultText(await generateSajuReading(prompt))
       setResult(text)
       setSelectedName(name.trim())
 
-      const payload = {
-        name: name.trim(),
-        birth_date: birthDate,
-        period: period || null,
-        hour: hour || null,
-        minute: minute || null,
-        gender,
-        calendar_type: calendarType,
-        result: text,
-        user_id: user.id,
-        profile_id: profile?.id || null,
+      if (!user) {
+        savePendingReading({ ...values, result: text })
+        setSelectedId(null)
+        scrollToResult()
+        return
       }
 
+      if (!profile) {
+        savePendingReading({ ...values, result: text })
+        setSelectedId(null)
+        scrollToResult()
+        return
+      }
+
+      const data = await persistReading({
+        text,
+        editingId,
+        values,
+        nextUser: user,
+        nextProfile: profile,
+      })
+      clearPendingReading()
+      setSelectedId(data.id)
       if (editingId) {
-        const { data, error: updateError } = await supabase
-          .from('saju_readings')
-          .update(payload)
-          .eq('id', editingId)
-          .select(READING_FIELDS)
-          .single()
-
-        if (updateError) {
-          throw new Error(updateError.message || '사주 결과 수정에 실패했습니다.')
-        }
-
-        setSelectedId(data.id)
         setReadings((prev) =>
           prev.map((reading) => (reading.id === data.id ? data : reading)),
         )
-        loadedSnapshotRef.current = currentSnapshot()
       } else {
-        const { data, error: saveError } = await supabase
-          .from('saju_readings')
-          .insert(payload)
-          .select(READING_FIELDS)
-          .single()
-
-        if (saveError) {
-          throw new Error(saveError.message || '사주 결과 저장에 실패했습니다.')
-        }
-
-        setSelectedId(data.id)
         setReadings((prev) => [data, ...prev])
-        loadedSnapshotRef.current = currentSnapshot()
+        setReadingCount((prev) =>
+          typeof prev === 'number' ? prev + 1 : prev,
+        )
       }
-
+      loadedSnapshotRef.current = currentSnapshot()
       scrollToResult()
     } catch (err) {
       let message = err.message || '사주 해석 중 오류가 발생했습니다.'
@@ -882,17 +1008,113 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    if (!authReady || !user || !profileReady) return
+    if (pendingRestoreRef.current) return
+
+    const pending = readPendingReading()
+    if (!pending?.result) return
+
+    pendingRestoreRef.current = true
+
+    setName(pending.name || '')
+    applyBirthDate(pending.birthDate || '')
+    setPeriod(pending.period || '')
+    setHour(pending.hour || '')
+    setMinute(pending.minute || '')
+    setGender(pending.gender || '')
+    setCalendarType(pending.calendarType || '')
+    setResult(normalizeResultText(pending.result))
+    setSelectedName((pending.name || '').trim())
+    setSelectedId(null)
+    scrollToResult()
+
+    if (!profile) {
+      setShowOnboarding(true)
+      setProfileError('전체 천기를 보관하려면 명식을 등록해 주세요.')
+      pendingRestoreRef.current = false
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await persistReading({
+          text: normalizeResultText(pending.result),
+          values: {
+            name: pending.name || '',
+            birthDate: pending.birthDate || '',
+            period: pending.period || '',
+            hour: pending.hour || '',
+            minute: pending.minute || '',
+            gender: pending.gender || '',
+            calendarType: pending.calendarType || '',
+          },
+          nextUser: user,
+          nextProfile: profile,
+        })
+        if (cancelled) return
+        clearPendingReading()
+        setSelectedId(data.id)
+        setReadings((prev) => {
+          if (prev.some((item) => item.id === data.id)) return prev
+          return [data, ...prev]
+        })
+        setReadingCount((prev) =>
+          typeof prev === 'number' ? prev + 1 : prev,
+        )
+        loadedSnapshotRef.current = snapshotOf({
+          name: pending.name || '',
+          birthDate: pending.birthDate || '',
+          period: pending.period || '',
+          hour: pending.hour || '',
+          minute: pending.minute || '',
+          gender: pending.gender || '',
+          calendarType: pending.calendarType || '',
+        })
+      } catch (err) {
+        if (!cancelled) {
+          pendingRestoreRef.current = false
+          setError(err.message || '로그인 후 결과 저장에 실패했습니다.')
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+      if (readPendingReading()?.result) {
+        pendingRestoreRef.current = false
+      }
+    }
+  }, [authReady, user?.id, profileReady, profile?.id])
+
   function fieldClass(isIncomplete) {
     return showMissing && isIncomplete ? 'field is-missing' : 'field'
   }
 
-  if (!authReady || !user) {
+  const isGuest = !user
+  const isResultLocked = Boolean(result && isGuest)
+  const lockedParts = isResultLocked
+    ? getLockedResultParts(result)
+    : { visible: resultParagraphs(result), hidden: [] }
+  const showWelcomeGate = authReady && !user && !hasEntered
+
+  function handleEnterApp() {
+    try {
+      window.sessionStorage.setItem(ENTERED_KEY, '1')
+    } catch {
+      // ignore
+    }
+    setHasEntered(true)
+  }
+
+  if (!authReady || showWelcomeGate) {
     return (
       <div className="page page-gate">
         <div className="atmosphere" aria-hidden="true" />
         <div className="gate-veil" aria-hidden="true" />
 
-        <main className="gate" aria-label="로그인">
+        <main className="gate" aria-label="입장">
           <p className="gate-eyebrow">전통 명식 · 운명 해석</p>
           <h1 className="gate-brand">백 선생의 사주</h1>
           <p className="gate-lede">
@@ -904,19 +1126,23 @@ function App() {
               문 앞에서 신명을 확인하는 중...
             </p>
           ) : (
-            <button
-              type="button"
-              className="gate-cta"
-              onClick={handleGoogleLogin}
-              disabled={authBusy}
-            >
-              {authBusy ? '문을 여는 중...' : 'Google로 들어가기'}
-            </button>
+            <>
+              <button
+                type="button"
+                className="gate-cta"
+                onClick={handleEnterApp}
+              >
+                들어가기
+              </button>
+              {typeof readingCount === 'number' && readingCount > 0 ? (
+                <p className="gate-trust">
+                  이때까지 총{' '}
+                  <span>{readingCount.toLocaleString('ko-KR')}</span>
+                  개의 사주가 생성되었습니다
+                </p>
+              ) : null}
+            </>
           )}
-
-          {authError ? <p className="gate-error">{authError}</p> : null}
-
-          <p className="gate-foot">로그인 후 명식을 등록하면 사주를 볼 수 있습니다.</p>
         </main>
       </div>
     )
@@ -1060,92 +1286,124 @@ function App() {
       <div className="layout">
         <aside className="sidebar" aria-label="저장된 사주 목록">
           <div className="auth-box">
-            <p className="auth-status">
-              {user.user_metadata?.full_name ||
-                user.user_metadata?.name ||
-                user.email ||
-                '로그인됨'}
-            </p>
-
-            {profiles.length > 0 ? (
+            {!authReady ? (
+              <p className="auth-status">로그인 확인 중...</p>
+            ) : user ? (
               <>
-                <label className="profile-select-label" htmlFor="profile-select">
-                  프로필 선택
-                </label>
-                <select
-                  id="profile-select"
-                  className="profile-select"
-                  value={profile?.id || ''}
-                  onChange={(event) => handleSelectProfile(event.target.value)}
-                  disabled={profileBusy}
-                >
-                  {profiles.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-                {profile ? (
-                  <p className="auth-meta">
-                    {[
-                      formatBirthDateLabel(profile.birth_date),
-                      profile.gender,
-                      profile.calendar_type,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                ) : null}
-              </>
-            ) : profileReady ? (
-              <p className="auth-meta">명식 미등록 · 프로필을 추가하세요</p>
-            ) : (
-              <p className="auth-meta">명식 불러오는 중...</p>
-            )}
+                <p className="auth-status">
+                  {user.user_metadata?.full_name ||
+                    user.user_metadata?.name ||
+                    user.email ||
+                    '로그인됨'}
+                </p>
 
-            <button
-              type="button"
-              className="auth-button auth-button-google"
-              onClick={() => {
-                setProfileError('')
-                if (profiles.length === 0) setShowOnboarding(true)
-                else setShowProfileCreate(true)
-              }}
-              disabled={!profileReady || profileBusy}
-            >
-              프로필 추가
-            </button>
-            <button
-              type="button"
-              className="auth-button"
-              onClick={() => {
-                setProfileError('')
-                setShowProfileEdit(true)
-              }}
-              disabled={!profileReady || !profile || profileBusy}
-            >
-              프로필 수정
-            </button>
-            <button
-              type="button"
-              className="auth-button auth-button-ghost"
-              onClick={handleLogout}
-              disabled={authBusy}
-            >
-              {authBusy ? '처리 중...' : '로그아웃'}
-            </button>
+                {profiles.length > 0 ? (
+                  <>
+                    <label
+                      className="profile-select-label"
+                      htmlFor="profile-select"
+                    >
+                      프로필 선택
+                    </label>
+                    <select
+                      id="profile-select"
+                      className="profile-select"
+                      value={profile?.id || ''}
+                      onChange={(event) =>
+                        handleSelectProfile(event.target.value)
+                      }
+                      disabled={profileBusy}
+                    >
+                      {profiles.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                    {profile ? (
+                      <p className="auth-meta">
+                        {[
+                          formatBirthDateLabel(profile.birth_date),
+                          profile.gender,
+                          profile.calendar_type,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    ) : null}
+                  </>
+                ) : profileReady ? (
+                  <p className="auth-meta">명식 미등록 · 프로필을 추가하세요</p>
+                ) : (
+                  <p className="auth-meta">명식 불러오는 중...</p>
+                )}
+
+                <button
+                  type="button"
+                  className="auth-button auth-button-google"
+                  onClick={() => {
+                    setProfileError('')
+                    if (profiles.length === 0) setShowOnboarding(true)
+                    else setShowProfileCreate(true)
+                  }}
+                  disabled={!profileReady || profileBusy}
+                >
+                  프로필 추가
+                </button>
+                <button
+                  type="button"
+                  className="auth-button"
+                  onClick={() => {
+                    setProfileError('')
+                    setShowProfileEdit(true)
+                  }}
+                  disabled={!profileReady || !profile || profileBusy}
+                >
+                  프로필 수정
+                </button>
+                <button
+                  type="button"
+                  className="auth-button auth-button-ghost"
+                  onClick={handleLogout}
+                  disabled={authBusy}
+                >
+                  {authBusy ? '처리 중...' : '로그아웃'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="auth-status">손님으로 천기를 엿보는 중</p>
+                <p className="auth-meta">
+                  먼저 사주를 풀어보고, 전체 결과는 로그인 후 여세요.
+                </p>
+                <button
+                  type="button"
+                  className="auth-button auth-button-google"
+                  onClick={handleGoogleLogin}
+                  disabled={authBusy}
+                >
+                  {authBusy ? 'Google로 이동 중...' : 'Google로 들어가기'}
+                </button>
+              </>
+            )}
             {authError ? <p className="auth-error">{authError}</p> : null}
           </div>
 
           <h2 className="sidebar-title">명부</h2>
           <p className="sidebar-lede">
-            {listLoading
-              ? '불러오는 중...'
-              : readings.length > 0
-                ? `저장된 사주 · ${readings.length}명`
-                : '저장된 사주'}
+            {!user
+              ? '로그인 후 보관'
+              : listLoading
+                ? '불러오는 중...'
+                : readings.length > 0
+                  ? `저장된 사주 · ${readings.length}명`
+                  : '저장된 사주'}
           </p>
-          {!listLoading && !listError && readings.length === 0 ? (
+          {!user ? (
+            <p className="sidebar-empty sidebar-empty-above">
+              로그인하면 풀이가 명부에 남습니다.
+            </p>
+          ) : !listLoading && !listError && readings.length === 0 ? (
             <p className="sidebar-empty sidebar-empty-above">
               아직 기록된 이름이 없습니다.
             </p>
@@ -1154,11 +1412,13 @@ function App() {
             type="button"
             className="sidebar-new"
             onClick={handleNewReading}
-            disabled={!profile}
+            disabled={user ? !profile : false}
           >
             새 사주 보기
           </button>
-          {listError ? (
+          {!user ? (
+            <p className="sidebar-empty">손님은 미리보기만 가능합니다.</p>
+          ) : listError ? (
             <div className="sidebar-empty-wrap">
               <p className="sidebar-empty">{listError}</p>
               <button
@@ -1215,14 +1475,37 @@ function App() {
             <p className="lede">
               {profile
                 ? `${profile.name}님의 명식을 불러와 풀이합니다.`
-                : '생시와 명식을 바탕으로, 담담하고 또렷하게 풀이합니다.'}
+                : isGuest
+                  ? '로그인 없이도 먼저 풀어볼 수 있습니다. 전체 천기는 로그인 후 열립니다.'
+                  : '생시와 명식을 바탕으로, 담담하고 또렷하게 풀이합니다.'}
             </p>
+            {typeof readingCount === 'number' && readingCount > 0 ? (
+              <p className="trust-count">
+                이때까지 총{' '}
+                <span>{readingCount.toLocaleString('ko-KR')}</span>
+                개의 사주가 생성되었습니다
+              </p>
+            ) : null}
           </header>
 
           <section
             className={isViewing ? 'panel is-viewing' : 'panel'}
             aria-label="사주 입력"
           >
+            {isGuest && !isViewing && (
+              <p className="profile-note">
+                손님도 사주를 볼 수 있습니다. 결과의 절반만 먼저 보여 드리고,
+                <button
+                  type="button"
+                  className="profile-note-link"
+                  onClick={handleGoogleLogin}
+                >
+                  Google 로그인
+                </button>
+                후 나머지를 열어 드립니다.
+              </p>
+            )}
+
             {user && profiles.length > 0 && !isViewing && (
               <p className="profile-note">
                 지금 선택된 프로필은 <strong>{profile?.name}</strong>입니다.
@@ -1498,17 +1781,13 @@ function App() {
                 type="button"
                 className="cta"
                 onClick={handleAnalyze}
-                disabled={loading || !user || !profile}
+                disabled={loading}
               >
                 {loading
                   ? '천기를 읽는 중...'
-                  : !user
-                    ? '로그인 후 사주 보기'
-                    : !profile
-                      ? '명식 등록 후 사주 보기'
-                      : selectedId
-                        ? '다시 풀어보기'
-                        : '내 사주 보기'}
+                  : selectedId
+                    ? '다시 풀어보기'
+                    : '내 사주 보기'}
               </button>
 
               {(selectedId || result) && (
@@ -1516,7 +1795,7 @@ function App() {
                   type="button"
                   className="cta-new"
                   onClick={handleNewReading}
-                  disabled={loading || !profile}
+                  disabled={loading || (user && !profile)}
                 >
                   새 사주 보기
                 </button>
@@ -1540,27 +1819,69 @@ function App() {
           {result && (
             <section
               id="result-panel"
-              className="result-panel"
+              className={
+                isResultLocked
+                  ? 'result-panel is-locked'
+                  : 'result-panel'
+              }
               aria-live="polite"
             >
-              <p className="result-eyebrow">천기 · 풀이</p>
+              <p className="result-eyebrow">
+                {isResultLocked ? '천기 · 미리보기' : '천기 · 풀이'}
+              </p>
               <h2>
                 {selectedName ? `${selectedName}님의 사주` : '해석'}
               </h2>
               {(birthDateLabel || gender || calendarType) && (
                 <p className="result-meta">
-                  {[birthDateLabel, gender, calendarType, birthTimeText !== '--:--' ? birthTimeText : '']
+                  {[
+                    birthDateLabel,
+                    gender,
+                    calendarType,
+                    birthTimeText !== '--:--' ? birthTimeText : '',
+                  ]
                     .filter(Boolean)
                     .join(' · ')}
                 </p>
               )}
               <div className="result-body">
-                {resultParagraphs(result).map((paragraph, index) => (
-                  <p key={`${selectedId || 'live'}-${index}`}>{paragraph}</p>
+                {lockedParts.visible.map((paragraph, index) => (
+                  <p key={`${selectedId || 'live'}-visible-${index}`}>
+                    {paragraph}
+                  </p>
                 ))}
               </div>
 
-              {selectedId && (
+              {isResultLocked && (
+                <div className="result-lock">
+                  <div className="result-lock-preview" aria-hidden="true">
+                    {(lockedParts.hidden.length
+                      ? lockedParts.hidden
+                      : ['봉인된 문장이 이곳에 이어진다.']
+                    ).map((paragraph, index) => (
+                      <p key={`hidden-${index}`}>{paragraph}</p>
+                    ))}
+                  </div>
+                  <div className="result-lock-veil">
+                    <p className="result-lock-title">나머지 천기는 봉인되어 있다</p>
+                    <p className="result-lock-text">
+                      Google로 들어가면 전체 풀이를 열고
+                      <br />
+                      명부에 남길 수 있습니다.
+                    </p>
+                    <button
+                      type="button"
+                      className="gate-cta result-lock-cta"
+                      onClick={handleGoogleLogin}
+                      disabled={authBusy}
+                    >
+                      {authBusy ? '문을 여는 중...' : '로그인하고 전체 보기'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {selectedId && !isResultLocked && (
                 <div className="share-actions">
                   <button
                     type="button"
