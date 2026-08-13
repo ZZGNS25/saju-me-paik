@@ -214,50 +214,9 @@ function App() {
 
   function getLockedResultParts(text) {
     const paragraphs = resultParagraphs(text)
-    if (paragraphs.length === 0) {
-      return { visible: [], hidden: [] }
-    }
-
-    const totalLen = paragraphs.reduce((sum, part) => sum + part.length, 0)
-    const limit = Math.max(1, Math.floor(totalLen / 2))
-    const visible = []
-    let used = 0
-
-    for (let i = 0; i < paragraphs.length; i++) {
-      const part = paragraphs[i]
-      const room = limit - used
-
-      if (room <= 0) {
-        return { visible, hidden: paragraphs.slice(i) }
-      }
-
-      if (part.length <= room) {
-        visible.push(part)
-        used += part.length
-        continue
-      }
-
-      const cut = Math.max(visible.length === 0 ? Math.min(room, part.length) : room, 1)
-      visible.push(`${part.slice(0, cut).trimEnd()}…`)
-      return {
-        visible,
-        hidden: paragraphs.slice(i),
-      }
-    }
-
-    if (paragraphs.length === 1) {
-      const only = paragraphs[0]
-      const cut = Math.max(1, Math.floor(only.length / 2))
-      return {
-        visible: [`${only.slice(0, cut).trimEnd()}…`],
-        hidden: [only],
-      }
-    }
-
-    const mid = Math.max(1, Math.floor(paragraphs.length / 2))
     return {
-      visible: paragraphs.slice(0, mid),
-      hidden: paragraphs.slice(mid),
+      visible: paragraphs.slice(0, 2),
+      hidden: paragraphs.slice(2),
     }
   }
 
