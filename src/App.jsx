@@ -217,18 +217,47 @@ function App() {
     if (paragraphs.length === 0) {
       return { visible: [], hidden: [] }
     }
-    if (paragraphs.length === 1) {
-      const full = paragraphs[0]
-      const cut = Math.max(40, Math.floor(full.length * 0.45))
+
+    const totalLen = paragraphs.reduce((sum, part) => sum + part.length, 0)
+    const limit = Math.max(1, Math.floor(totalLen / 2))
+    const visible = []
+    let used = 0
+
+    for (let i = 0; i < paragraphs.length; i++) {
+      const part = paragraphs[i]
+      const room = limit - used
+
+      if (room <= 0) {
+        return { visible, hidden: paragraphs.slice(i) }
+      }
+
+      if (part.length <= room) {
+        visible.push(part)
+        used += part.length
+        continue
+      }
+
+      const cut = Math.max(visible.length === 0 ? Math.min(room, part.length) : room, 1)
+      visible.push(`${part.slice(0, cut).trimEnd()}…`)
       return {
-        visible: [full.slice(0, cut).trimEnd() + '…'],
-        hidden: [full],
+        visible,
+        hidden: paragraphs.slice(i),
       }
     }
-    const visibleCount = Math.max(1, Math.ceil(paragraphs.length / 2))
+
+    if (paragraphs.length === 1) {
+      const only = paragraphs[0]
+      const cut = Math.max(1, Math.floor(only.length / 2))
+      return {
+        visible: [`${only.slice(0, cut).trimEnd()}…`],
+        hidden: [only],
+      }
+    }
+
+    const mid = Math.max(1, Math.floor(paragraphs.length / 2))
     return {
-      visible: paragraphs.slice(0, visibleCount),
-      hidden: paragraphs.slice(visibleCount),
+      visible: paragraphs.slice(0, mid),
+      hidden: paragraphs.slice(mid),
     }
   }
 
@@ -1852,7 +1881,7 @@ function App() {
                 <div className="result-lock">
                   <div className="result-lock-preview" aria-hidden="true">
                     {(lockedParts.hidden.length
-                      ? lockedParts.hidden
+                      ? lockedParts.hidden.slice(0, 2)
                       : ['봉인된 문장이 이곳에 이어진다.']
                     ).map((paragraph, index) => (
                       <p key={`hidden-${index}`}>{paragraph}</p>
